@@ -1,10 +1,13 @@
 - scope: global
   var:
     source_folder: "./test/test-input"
-    mk.raw_data: "./test/test-output/raw_data"
-    read1_suffix: ".read_1.fastq.gz"
-    read2_suffix: ".read_2.fastq.gz"
     mk.project_folder: './test/test-output/'
+    mk.genomes_folder: './test/test-output/genomes/'
+    organism: 'caenorhabditis_elegans'
+    release: '115'
+    seq_type: toplevel
+    daviddatabase: "ENSEMBL_GENE_ID"
+    DAVIDUSER: ""
     # mk.kallisto_output: './test/test-output/kallisto_output'
     # mk.kallisto_index: './test/test-output/kallisto_index'
     # mk.fastqc_output: './test/test-output/fastqc_output'
@@ -30,14 +33,6 @@
       GSM3717990;WT-L4\n
       GSM3717991;sftb-1\n
       GSM3717992;sftb-1
-    mk.genomes_folder: './test/test-output/genomes/'
-    organism: 'caenorhabditis_elegans'
-    release: '115'
-    seq_type: toplevel
-    # fasta_file: ./test/test-output/genomes/caenorhabditis_elegans/115/caenorhabditis_elegans.115.toplevel.dna.fa
-    # gtf_file: ./test/test-output/genomes/caenorhabditis_elegans/115/caenorhabditis_elegans.115.no.rRNA.gtf
-    # url_gtf: 'ftp://ftp.ensembl.org/pub/release-115/gtf/caenorhabditis_elegans/'
-    # url_dna: 'ftp://ftp.ensembl.org/pub/release-115/fasta/caenorhabditis_elegans/dna/'
     # ercc_label: 'ercc92'
     # url_ercc_gtf: 'https://datashare.mpcdf.mpg.de/s/MOxbNrXeBNcg9wt/download'
     # url_ercc_fa: 'https://datashare.mpcdf.mpg.de/s/H9PQu3vDRi9saqV/download'
@@ -57,8 +52,8 @@
     cpus: 12
 
 - scope: process
-  name:
-    - download_gtf
-    - download_dna
+  name: "annotations"
   var:
-    mk.output_folder: "./test/test-output/genomes/caenorhabditis_elegans/115/"
+    biomart_dataset: "celegans_gene_ensembl"
+    biomart_host: "http://sep2025.archive.ensembl.org/biomart/"
+    biotypes_go: "./test/test-output/biotypes_go.txt"
