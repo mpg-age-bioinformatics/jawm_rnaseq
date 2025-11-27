@@ -1,1 +1,12 @@
-13fb536154e7cf36a394d9b09ff99b7a  test.fastq.gz  https://ndownloader.figshare.com/files/57999445
+3b6dfaf6e724aab1a4babf6aba88db58  daf2_treated.Rep_1.READ_1.fastq.gz  https://ndownloader.figshare.com/files/58690516
+cb1692b290811f377cd2919a443d86c7  daf2_treated.Rep_2.READ_1.fastq.gz  https://ndownloader.figshare.com/files/58690393
+2fcdea881752e014e0150a1b8cfb35bc  daf2_treated.Rep_3.READ_1.fastq.gz  https://ndownloader.figshare.com/files/58690387
+6303461fe2e8b8283b6cb41a95ee707e  daf2.Rep_1.READ_1.fastq.gz  https://ndownloader.figshare.com/files/58690417
+e01225d9bf4f2ab3c3fe447bdc2d2004  daf2.Rep_2.READ_1.fastq.gz  https://ndownloader.figshare.com/files/58690411
+8a895bc86d37647b5a6a57e842c68f8c  daf2.Rep_3.READ_1.fastq.gz  https://ndownloader.figshare.com/files/58690405 
+9c2b62a5b940a2cb9942f7413ce75f22  N2_treated.Rep_1.READ_1.fastq.gz  https://ndownloader.figshare.com/files/58690402
+b502103f640be7f10b32b0754355e130  N2_treated.Rep_2.READ_1.fastq.gz  https://ndownloader.figshare.com/files/58690396
+0d5aa56947877744b4409a032a03b953  N2_treated.Rep_3.READ_1.fastq.gz  https://ndownloader.figshare.com/files/58690390  
+4f8e2a955b9d1f15506e6143cb13c6ca  N2.Rep_1.READ_1.fastq.gz  https://ndownloader.figshare.com/files/58690420
+b1cc365dc6b967e42cf5296a2c741442  N2.Rep_2.READ_1.fastq.gz  https://ndownloader.figshare.com/files/58690414
+a6518ef73e3dbcb37f8a59fe705077f2  N2.Rep_3.READ_1.fastq.gz  https://ndownloader.figshare.com/files/58690408

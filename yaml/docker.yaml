@@ -1,24 +1,31 @@
 # a docker yaml rnaseq
-- scope: process
-  name: "rnaseq_p1"
-  container: "ubuntu:24.04"
-  environment: "docker"
-  var:
-    extra_args: ""
-    my_rnaseq_argument: "This is just a rnaseq."
-
-- scope: process
-  name: "rnaseq_p2"
-  container: "python:3.13-slim"
-  environment: "docker"
-  var:
-    map.file: "./test/data.txt"
-
-- scope: process
-  name: "rnaseq_p3"
-  container: "r-base:4.5.1"
-  environment: "docker"
-
 - scope: global
+  environment: "docker"
   var:
-    mk.output: "./test/test-output"
+    source_folder: "./test/test-input"
+    mk.raw_data: "./test/test-output/raw_data"
+    read1_suffix: ".read_1.fastq.gz"
+    read2_suffix: ".read_2.fastq.gz"
+    # groups:
+    #   daf2_treated.Rep_1.READ_1.fastq.gz;;daf2_treated\n
+    #   daf2_treated.Rep_2.READ_1.fastq.gz;;daf2_treated\n
+    #   daf2_treated.Rep_3.READ_1.READ_1.fastq.gz;;daf2_treated\n
+    #   daf2.Rep_1.READ_1.fastq.gz;;daf2_untreated\n
+    #   daf2.Rep_2.READ_1.fastq.gz;;daf2_untreated\n
+    #   daf2.Rep_3.READ_1.fastq.gz;;daf2_untreated\n
+    #   N2_treated.Rep_1.READ_1.fastq.gz;;N2_treated\n
+    #   N2_treated.Rep_2.READ_1.fastq.gz;;N2_treated\n
+    #   N2_treated.Rep_3.READ_1.READ_1.fastq.gz;;N2_treated\n
+    #   N2.Rep_1.READ_1.fastq.gz;;N2_untreated\n
+    #   N2.Rep_2.READ_1.fastq.gz;;N2_untreated\n
+    #   N2.Rep_3.READ_1.fastq.gz;;N2_untreated
+    geoacc: GSE129642
+    groups:
+      GSM3717989;WT-L4\n
+      GSM3717990;WT-L4\n
+      GSM3717991;sftb-1\n
+      GSM3717992;sftb-1
+# - scope: process
+#   name: fastqc
+#   var:
+#     mk.raw_data: "./test/test-output/raw_data"
