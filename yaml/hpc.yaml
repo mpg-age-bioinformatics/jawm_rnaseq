@@ -14,3 +14,17 @@
     - genome_collector
     - get_erccs
   manager: local
+
+- scope: process
+  name: fastqc
+  var:
+    ncores: 4
+
+- scope: process
+  name: 
+    - unstranded_mapping
+    - mapping
+    - geneid
+    - biotype
+  var:
+    cpus: 12

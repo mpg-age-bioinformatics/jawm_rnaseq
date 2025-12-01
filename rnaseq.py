@@ -2,6 +2,11 @@ import jawm
 import os
 import re
 import pandas as pd
+import random
+import string
+import logging
+
+logger = logging.getLogger("jawm")
 
 preprocess=jawm.Process( 
     name="preprocess",
@@ -96,7 +101,7 @@ Path( os.path.join( dest_folder,"preprocess.touch" ) ).touch()
         "raw_data":"Samples with multiple runs will be concatenated into one file an located to this folder. Sample with only one file will be symlinked to this folder.", 
         "copy": "If True it will it will copy the original raw data file into its new location instead of creating symbolic links."
     },
-    container="mpgagebioinformatics/agepy:441ee35",
+    container="mpgagebioinformatics/agepy:7c412ae",
 )
 
 if __name__ == "__main__":
@@ -116,7 +121,31 @@ if __name__ == "__main__":
         "jawm_deseq2",
         ])
 
-    workflows, var, args, unknown_args= jawm.utils.parse_arguments(["main","rnaseq","test"])
+    ##################
+    # read arguments #
+    ##################
+
+    workflows, var, args, unknown_args= jawm.utils.parse_arguments(["main","rnaseq","test"], extra_args={
+        "--geo": "A GEO acession number of the form GSE129642.",
+        "--groups" : "A table of the form geo acession number, sample id, group",
+        })
+
+    if args.geo :
+        jawm.Process.update( var={
+            "geoacc" : args.geo,
+            } )
+
+    if args.groups :
+        groups=args.groups.split("\n")
+        groups=[ s.replace(";","_") for s in groups if s ]
+        nsamples=int(len(groups) / 2)
+        samples=groups[:nsamples]
+        groups=groups[nsamples:]
+        groups=[ f"{a};{b}" for a, b in zip(samples, groups) ]
+        groups="\n".join(groups)
+        jawm.Process.update( var={
+            "groups" : groups,
+            } )
 
     # usage: 
 
@@ -126,32 +155,84 @@ if __name__ == "__main__":
         # download required images #
         ############################
 
-        # images=get_image( [ 
-        #     preprocess.container,
-        #     sra.read_geo.container, 
-        #     sra.prefetch.container,
-        #     kallisto.get_erccs.container,
-        #     kallisto.writecdna.container,
-        #     kallisto.indexer.container,
-        #     kallisto.gene_model.container,
-        #     multiqc.multiqc.container,
-        #     deseq2.annotations.container,
-        #     deseq2.deseq2.container,
-        #     deseq2.topgo.container,
-        #     deseq2.cellplot.container,
-        #     ] )
+        images=get_image( [ 
+            preprocess.container,
+            sra.read_geo.container, 
+            sra.prefetch.container,
+            kallisto.get_erccs.container,
+            kallisto.writecdna.container,
+            kallisto.indexer.container,
+            kallisto.gene_model.container,
+            multiqc.multiqc.container,
+            deseq2.annotations.container,
+            deseq2.deseq2.container,
+            deseq2.topgo.container,
+            deseq2.cellplot.container,
+            ] )
 
-        ####################
-        # collect raw data #
-        ####################
 
-        # check if sra data must be download or if the user is analysing local data
+        #################
+        # set variables #
+        #################
+
         # all geo analysis must have sra.read_geo.var["geoacc"] defined
-
         sra_download=False
         if "geoacc" in sra.read_geo.var :
             if sra.read_geo.var["geoacc"] :
                 sra_download=True
+                if "organism" not in genomes.download_gtf.var :
+                    organism=sra.get_unique_sample_organism( sra.read_geo.var["geoacc"] )
+                    jawm.Process.update( var={ "organism" : organism } )
+                elif not genomes.download_gtf.var["organism"] :
+                    organism=sra.get_unique_sample_organism( sra.read_geo.var["geoacc"] )
+                    jawm.Process.update( var={ "organism" : organism } )
+                var["organism"]=organism
+
+
+        if genomes.download_gtf.var["release"] == "last" :
+            release=genomes.get_latest_ensembl_release()
+            jawm.Process.update( var={ "release" : release } )
+            var["release"]=release
+
+
+        if "seq_type" not in genomes.download_dna.var :
+            seq_type=genomes.check_primary_assembly_exists( genomes.download_dna.var['organism'], genomes.download_dna.var['release'] )
+            jawm.Process.update( var={ "seq_type" : seq_type } )
+        elif not genomes.download_dna.var["seq_type"] :
+            seq_type=genomes.check_primary_assembly_exists( genomes.download_dna.var['organism'], genomes.download_dna.var['release'] )
+            jawm.Process.update( var={ "seq_type" : seq_type } )
+
+
+        if not sra_download :
+            chars = string.ascii_letters + string.digits
+            chars = ''.join(random.choices(chars, k=7))
+            default_location="../jawm_rnaseq_"+chars
+        else:
+            default_location="../jawm_rnaseq_"+sra.read_geo.var["geoacc"]
+        
+        if "project_folder" not in var :
+            logger.info(f"Output folder: {default_location}")
+            if os.path.isdir(default_location) :
+                logger.warning(f"{default_location} already exists.")
+            else:
+                os.makedirs(default_location)
+            jawm.Process.update( var={ "map.project_folder" : default_location } )
+            var["project_folder"]=default_location
+
+        if "genomes_folder" not in var:
+            logger.info(f"Genomes folder: {default_location}")
+            if os.path.isdir(default_location) :
+                logger.warning(f"{default_location} already exists.")
+            else:
+                os.makedirs(default_location)
+            jawm.Process.update( var={ "map.genomes_folder" : default_location } )
+            var["genomes_folder"]=default_location
+
+        biotypes_go = os.path.join( var["genomes_folder"], var["organism"], var["release"], "biotypes_go.txt" )
+        if "biotypes_go" not in deseq2.annotations.var :
+            jawm.Process.update( var={ "map.biotypes_go" : biotypes_go } )
+        elif not deseq2.annotations.var["biotypes_go"] :
+            jawm.Process.update( var={ "map.biotypes_go" : biotypes_go } )
 
         jawm.Process.update( var={
             "read1_suffix" : ".read_1.fastq.gz",
@@ -163,6 +244,10 @@ if __name__ == "__main__":
             "read1_suffix":".read_1.fastq.gz",
             "read2_suffix":".read_2.fastq.gz"
         })
+
+        ####################
+        # collect raw data #
+        ####################
 
         if not sra_download :
 
