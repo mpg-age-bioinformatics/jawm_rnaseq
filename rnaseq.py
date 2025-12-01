@@ -103,6 +103,7 @@ if __name__ == "__main__":
     import sys
     from jawm.utils import workflow, load_modules, get_image, id_files
     from pathlib import Path
+    import glob
 
     # load modules from online git repos
     load_modules([
@@ -125,16 +126,20 @@ if __name__ == "__main__":
         # download required images #
         ############################
 
-        images=get_image( [ 
-            preprocess.container,
-            sra.read_geo.container, 
-            sra.prefetch.container,
-            kallisto.get_erccs.container,
-            kallisto.writecdna.container,
-            kallisto.indexer.container,
-            kallisto.gene_model.container,
-            multiqc.multiqc.container
-            ] )
+        # images=get_image( [ 
+        #     preprocess.container,
+        #     sra.read_geo.container, 
+        #     sra.prefetch.container,
+        #     kallisto.get_erccs.container,
+        #     kallisto.writecdna.container,
+        #     kallisto.indexer.container,
+        #     kallisto.gene_model.container,
+        #     multiqc.multiqc.container,
+        #     deseq2.annotations.container,
+        #     deseq2.deseq2.container,
+        #     deseq2.topgo.container,
+        #     deseq2.cellplot.container,
+        #     ] )
 
         ####################
         # collect raw data #
@@ -153,6 +158,11 @@ if __name__ == "__main__":
             "read2_suffix": ".read_2.fastq.gz",
             "mk.raw_data": os.path.join( var["project_folder"], "raw_data" )
             } )
+
+        var.update({
+            "read1_suffix":".read_1.fastq.gz",
+            "read2_suffix":".read_2.fastq.gz"
+        })
 
         if not sra_download :
 
@@ -360,7 +370,7 @@ if __name__ == "__main__":
         ##########
 
         deseq2_dic={
-            "map.deseq2_output": os.path.join( var["project_folder"], "deseq2_output" ),
+            "mk.deseq2_output": os.path.join( var["project_folder"], "deseq2_output" ),
             "map.kallisto_output": os.path.join( var["project_folder"], "kallisto_output" ),
             "map.gtf": gtf_file
         }
@@ -369,8 +379,9 @@ if __name__ == "__main__":
 
         deseq2.tx2gene.execute( )
         deseq2.annotations.execute()
+        deseq2.parse_submission.var["rep_prefix"]=".rep_"
         deseq2.parse_submission.execute()
-        deseq2.tx2gene_proc.execute( tx2gene.hash )
+        deseq2.tx2gene_proc.execute( deseq2.tx2gene.hash )
 
         jawm.Process.wait([ deseq2.tx2gene_proc.hash, deseq2.parse_submission.hash ])
 
@@ -409,7 +420,7 @@ if __name__ == "__main__":
             topgo_.execute( )
             topgo_jobs.append( topgo_.hash )
 
-        jawm.Process.wait( topgo_jobs + [ david.hash ] )
+        jawm.Process.wait( topgo_jobs + [ deseq2.david.hash ] )
 
         david_files=glob.glob(os.path.join(annotated_output, "*.DAVID.tsv"))
         togo_files=glob.glob(os.path.join(annotated_output, "*.topGO.tsv"))
