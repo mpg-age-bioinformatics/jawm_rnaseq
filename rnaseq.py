@@ -13,11 +13,13 @@ preprocess=jawm.Process(
     when=lambda p: not os.path.isfile( os.path.join( p.var["raw_data"],"preprocess.touch" ) ) ,
     script="""#!/usr/bin/env python3
 import os
+import gzip
 import AGEpy as age
 import re
 from pathlib import Path
 import pandas as pd
 import shutil
+from concurrent.futures import ProcessPoolExecutor, as_completed
 
 def concat_gz_files(files, output):
     with gzip.open(output, "wt") as outfile:
@@ -34,74 +36,86 @@ def add_rep_suffix(groups):
         output.append(f"rep_{counts[g]}")
     return output
 
-groups="{{groups}}".replace("\\x01", "" )
-groups=groups.strip().strip(";")
-groups = re.sub(r'\s*([;])\s*', r'\\1', groups )
-groups=[ s.split(";") for s in groups.split("\\n") ]
-groups=pd.DataFrame(groups, columns=["file_1", "file_2","group"] )
-groups["group"] = groups["group"].apply(lambda x: age.safe_filename(x) )
-groups["rep"]=add_rep_suffix( groups["group"] )
+groups = "{{groups}}".replace("\\x01", "" )
+groups = groups.strip().strip(";")
+groups = re.sub(r'\s*([;])\s*', r'\\1', groups)
+groups = [s.split(";") for s in groups.split("\\n")]
+groups = pd.DataFrame(groups, columns=["file_1", "file_2", "group"])
+groups["group"] = groups["group"].apply(lambda x: age.safe_filename(x))
+groups["rep"] = add_rep_suffix(groups["group"])
 
-source_folder="{{source_folder}}"
-dest_folder="{{raw_data}}"
+source_folder = "{{source_folder}}"
+dest_folder = "{{raw_data}}"
 
 if not os.path.isdir(dest_folder):
     os.makedirs(dest_folder)
 
-for i in groups.index.tolist():
-    source_files_1=groups.loc[i,"file_1"]
-    source_files_2=groups.loc[i,"file_2"]
+# We'll collect all concat jobs and run them with max 4 workers
+futures = []
 
-    group=groups.loc[i,"group"]
-    rep=groups.loc[i,"rep"]
+with ProcessPoolExecutor(max_workers=int({{parallel}}) ) as executor:
+    for i in groups.index.tolist():
+        source_files_1 = groups.loc[i, "file_1"]
+        source_files_2 = groups.loc[i, "file_2"]
 
-    dest_path_1=os.path.join(dest_folder,f"{group}.{rep}.read_1.fastq.gz")
-    dest_path_2=os.path.join(dest_folder,f"{group}.{rep}.read_2.fastq.gz")
+        group = groups.loc[i, "group"]
+        rep = groups.loc[i, "rep"]
 
-    if os.path.exists(dest_path_1) : 
-        print(f"{dest_path_1} already exists. File will not be overwritten. Using existing files.")
-        continue
+        dest_path_1 = os.path.join(dest_folder, f"{group}.{rep}.read_1.fastq.gz")
+        dest_path_2 = os.path.join(dest_folder, f"{group}.{rep}.read_2.fastq.gz")
 
-    if "," not in source_files_1:
+        if os.path.exists(dest_path_1):
+            print(f"{dest_path_1} already exists. File will not be overwritten. Using existing files.")
+            continue
 
-        # deal with one run per sample first
-        source_name_1=source_files_1
-        source_path_1=os.path.join(source_folder,source_files_1)
+        # ---- Single-run case: just symlink/copy, no need for pool ----
+        if "," not in source_files_1:
+            # deal with one run per sample first
+            source_name_1 = source_files_1
+            source_path_1 = os.path.join(source_folder, source_files_1)
 
-        if str("{{copy}}").lower() != "true" :
-            os.symlink(source_path_1, dest_path_1)
-        else:
-            shutil.copy2(source_path_1,dest_path_1)
-
-    
-        if source_files_2 :
-
-            source_name_2=source_files_2
-            source_path_2=os.path.join(source_folder,source_files_2)
-
-            if str("{{copy}}").lower() != "true" :  
-                os.symlink(source_path_2, dest_path_2)
+            if str("{{copy}}").lower() != "true":
+                os.symlink(source_path_1, dest_path_1)
             else:
-                shutil.copy2(source_path_1,dest_path_1)
-        
-    else:
+                shutil.copy2(source_path_1, dest_path_1)
 
-        # now deal with concatenations
-        source_name_1=[ os.path.join(source_folder,s) for s in source_files_1.split(",") ]
-        concat_gz_files(source_name_1, dest_path_1)
-        if source_files_2 :
-            source_name_2=[ os.path.join(source_folder,s) for s in source_files_2.split(",") ]
-            concat_gz_files(source_name_2, dest_path_2)
+            if source_files_2:
+                source_name_2 = source_files_2
+                source_path_2 = os.path.join(source_folder, source_files_2)
 
-Path( os.path.join( dest_folder,"preprocess.touch" ) ).touch()
+                if str("{{copy}}").lower() != "true":
+                    os.symlink(source_path_2, dest_path_2)
+                else:
+                    # NOTE: this used to copy source_path_1 by mistake
+                    shutil.copy2(source_path_2, dest_path_2)
+
+        # ---- Multi-run case: schedule concatenations in the pool ----
+        else:
+            # now deal with concatenations
+            source_name_1 = [os.path.join(source_folder, s) for s in source_files_1.split(",")]
+            futures.append(executor.submit(concat_gz_files, source_name_1, dest_path_1))
+
+            if source_files_2:
+                source_name_2 = [os.path.join(source_folder, s) for s in source_files_2.split(",")]
+                futures.append(executor.submit(concat_gz_files, source_name_2, dest_path_2))
+
+    # Wait for all concatenations to finish and raise exceptions if any
+    for fut in as_completed(futures):
+        fut.result()
+
+# Only touch the file once everything is done
+Path(os.path.join(dest_folder, "preprocess.touch")).touch()
 """,
+    var={
+        "parallel": 4
+    },
     desc={
         "groups": "A dictionary like structure '<file_read_1>:<file_read_2>:<group_name>;<file_read_1>:<file_read_2>:<group_name>;..' ",
         "source_folder": "Folder where the data is currently located.",
         "raw_data":"Samples with multiple runs will be concatenated into one file an located to this folder. Sample with only one file will be symlinked to this folder.", 
         "copy": "If True it will it will copy the original raw data file into its new location instead of creating symbolic links."
     },
-    container="mpgagebioinformatics/agepy:7c412ae",
+    container="mpgagebioinformatics/agepy:50ce16b",
 )
 
 if __name__ == "__main__":
@@ -110,7 +124,10 @@ if __name__ == "__main__":
     from pathlib import Path
     import glob
 
-    # load modules from online git repos
+    #####################
+    # load dependencies #
+    #####################
+
     load_modules([
         "jawm_sra",
         "jawm_fastqc",
@@ -120,6 +137,13 @@ if __name__ == "__main__":
         "jawm_multiqc",
         "jawm_deseq2",
         ])
+
+
+    ############################
+    # download required images #
+    ############################
+
+    # images=get_image( )
 
     ##################
     # read arguments #
@@ -135,73 +159,77 @@ if __name__ == "__main__":
             "geoacc" : args.geo,
             } )
 
+    # all geo analysis must have sra.read_geo.var["geoacc"] defined
+    sra_download=False
+    if "geoacc" in sra.read_geo.var :
+        if sra.read_geo.var["geoacc"] :
+            sra_download=True
+
     if args.groups :
+
+        if sra_download :
+            # sra groups are given in the form
+            # <samples list><groups_list> 
+            n=2
+        else:
+            # own data groups are given in the form
+            # <list of read 1 files><list of read 2 files><groups_list> 
+            n=3
+        
         groups=args.groups.split("\n")
         groups=[ s.replace(";","_") for s in groups if s ]
-        nsamples=int(len(groups) / 2)
-        samples=groups[:nsamples]
-        groups=groups[nsamples:]
-        groups=[ f"{a};{b}" for a, b in zip(samples, groups) ]
-        groups="\n".join(groups)
-        jawm.Process.update( var={
-            "groups" : groups,
-            } )
+        size = len(groups) // n
+        groups = [ groups[ i*size : (i+1)*size ] for i in range(n) ]
 
+        if sra_download:
+            samples=groups[0]
+            groups=groups[-1]
+            groups=[ f"{a};{b}" for a, b in zip(samples, groups) ]
+        else:
+            samples=groups[0]
+            samples_=groups[0]
+            groups=groups[-1]
+            groups=[ f"{a};{b};{c}" for a, b, c in zip( samples, samples_, groups ) ]
+
+        groups=r"\n".join(groups)
+
+        jawm.Process.update( var={ "groups" : groups } )
+
+    print(groups)
+    
     # usage: 
 
     if workflow( ["main","rnaseq","test"], workflows ) :
 
-        ############################
-        # download required images #
-        ############################
 
-        images=get_image( [ 
-            preprocess.container,
-            sra.read_geo.container, 
-            sra.prefetch.container,
-            kallisto.get_erccs.container,
-            kallisto.writecdna.container,
-            kallisto.indexer.container,
-            kallisto.gene_model.container,
-            multiqc.multiqc.container,
-            deseq2.annotations.container,
-            deseq2.deseq2.container,
-            deseq2.topgo.container,
-            deseq2.cellplot.container,
-            ] )
+        #########################
+        # check & set variables #
+        #########################
 
+        # organism
+        if sra_download :
+            if "organism" not in genomes.download_gtf.var :
+                organism=sra.get_unique_sample_organism( sra.read_geo.var["geoacc"] )
+                jawm.Process.update( var={ "organism" : organism } )
+            elif not genomes.download_gtf.var["organism"] :
+                organism=sra.get_unique_sample_organism( sra.read_geo.var["geoacc"] )
+                jawm.Process.update( var={ "organism" : organism } )
+            var["organism"]=organism
 
-        #################
-        # set variables #
-        #################
-
-        # all geo analysis must have sra.read_geo.var["geoacc"] defined
-        sra_download=False
-        if "geoacc" in sra.read_geo.var :
-            if sra.read_geo.var["geoacc"] :
-                sra_download=True
-                if "organism" not in genomes.download_gtf.var :
-                    organism=sra.get_unique_sample_organism( sra.read_geo.var["geoacc"] )
-                    jawm.Process.update( var={ "organism" : organism } )
-                elif not genomes.download_gtf.var["organism"] :
-                    organism=sra.get_unique_sample_organism( sra.read_geo.var["geoacc"] )
-                    jawm.Process.update( var={ "organism" : organism } )
-                var["organism"]=organism
-
-
+        # genome release
         if genomes.download_gtf.var["release"] == "last" :
             release=genomes.get_latest_ensembl_release()
             jawm.Process.update( var={ "release" : release } )
             var["release"]=release
 
-
+        # seq type: primary_assembly vs. toplevel (preference for primary_assembly )
+        seq_type=genomes.check_primary_assembly_exists( genomes.download_dna.var['organism'], genomes.download_dna.var['release'] )
         if "seq_type" not in genomes.download_dna.var :
-            seq_type=genomes.check_primary_assembly_exists( genomes.download_dna.var['organism'], genomes.download_dna.var['release'] )
             jawm.Process.update( var={ "seq_type" : seq_type } )
+            var["seq_type"]=seq_type
         elif not genomes.download_dna.var["seq_type"] :
-            seq_type=genomes.check_primary_assembly_exists( genomes.download_dna.var['organism'], genomes.download_dna.var['release'] )
             jawm.Process.update( var={ "seq_type" : seq_type } )
-
+            var["seq_type"]=seq_type
 
         if not sra_download :
             chars = string.ascii_letters + string.digits
@@ -210,6 +238,7 @@ if __name__ == "__main__":
         else:
             default_location="../jawm_rnaseq_"+sra.read_geo.var["geoacc"]
         
+        # output folder
         if "project_folder" not in var :
             logger.info(f"Output folder: {default_location}")
             if os.path.isdir(default_location) :
@@ -219,6 +248,7 @@ if __name__ == "__main__":
             jawm.Process.update( var={ "map.project_folder" : default_location } )
             var["project_folder"]=default_location
 
+        # genomes folder
         if "genomes_folder" not in var:
             logger.info(f"Genomes folder: {default_location}")
             if os.path.isdir(default_location) :
@@ -228,11 +258,19 @@ if __name__ == "__main__":
             jawm.Process.update( var={ "map.genomes_folder" : default_location } )
             var["genomes_folder"]=default_location
 
+        # BioMart biotypes and go annotation file
         biotypes_go = os.path.join( var["genomes_folder"], var["organism"], var["release"], "biotypes_go.txt" )
         if "biotypes_go" not in deseq2.annotations.var :
-            jawm.Process.update( var={ "map.biotypes_go" : biotypes_go } )
+            jawm.Process.update( var={ "mk.biotypes_go_dir" : os.path.dirname( biotypes_go ) } )
+            jawm.Process.update( var={ "biotypes_go" : biotypes_go } )
         elif not deseq2.annotations.var["biotypes_go"] :
-            jawm.Process.update( var={ "map.biotypes_go" : biotypes_go } )
+            jawm.Process.update( var={ "mk.biotypes_go_dir" : os.path.dirname( biotypes_go ) } )
+            jawm.Process.update( var={ "biotypes_go" : biotypes_go } )
+
+        # user's raw data folder
+        if not sra_download :
+            if not "source_folder" not in var:
+                jawm.Process.update( var={ "source_folder" : "./" } )
 
         jawm.Process.update( var={
             "read1_suffix" : ".read_1.fastq.gz",
@@ -255,6 +293,20 @@ if __name__ == "__main__":
             # local data #
             ##############
 
+            # for some samples there might be more than one SRA per sample
+            # which we will concatenate
+            n_concats=groups.split('\n')
+            n_concats=[ s.split(";")[0] for s in in n_concats ]+[ s.split(";")[1] for s in in n_concats ]
+            n_concats=[ s for s in n_concats if "," in s ]
+            n_concats=len(n_concats)
+
+            if n_concats < 5 :
+                preprocess.var["parallel"]=n_concats
+                preprocess.manager="local"
+            elif preprocess.manager="slurm" :
+                preprocess.var["parallel"]=n_concats
+                preprocess.manager_slurm={"--mem":"20GB", "-t":"1:00:00", "-c":str(n_concats) }
+
             preprocess.execute()
             jawm.Process.wait( preprocess.hash )
         
@@ -268,6 +320,8 @@ if __name__ == "__main__":
             jawm.Process.wait( sra.read_geo.hash )
 
             input_xlsx=os.path.join( sra.read_geo.var["raw_data"], f"{sra.read_geo.var['geoacc']}.samples.xlsx"  )
+            input_tsv=os.path.join( sra.read_geo.var["raw_data"], f"{sra.read_geo.var['geoacc']}.samples.tsv"  )
+
             df=pd.read_excel( input_xlsx )
             sra_ids=df["Run"].tolist()
 
@@ -278,16 +332,29 @@ if __name__ == "__main__":
                 prefetch_=sra.prefetch.clone()
                 prefetch_.var["sraid"]=sraid
                 prefetch_.execute()
-                jawm.Process.wait( prefetch_.hash )
+
+                if "parallel_download" not in var:
+
+                    jawm.Process.wait( prefetch_.hash )
 
                 # send extraction jobs to background
                 fastq_dump_=sra.fastq_dump.clone()
                 fastq_dump_.var["sraid"]=sraid
-                fastq_dump_.execute(  )
+                fastq_dump_.execute( prefetch_.hash )
 
                 fastq_dump_jobs.append( fastq_dump_.hash )
             
             jawm.Process.wait( fastq_dump_jobs )
+
+            # for some samples there might be more than one SRA per sample
+            # which we will concatenate
+            n_concats=sra.get_nconcatenations( input_tsv )
+            if n_concats < 5 :
+                sra.relabel_geo.var["parallel"]=n_concats
+                sra.relabel_geo.manager="local"
+            elif sra.relabel_geo.manager="slurm" :
+                sra.relabel_geo.var["parallel"]=n_concats
+                sra.relabel_geo.manager_slurm={"--mem":"20GB", "-t":"1:00:00", "-c":str(n_concats) }
 
             sra.relabel_geo.execute( )
 

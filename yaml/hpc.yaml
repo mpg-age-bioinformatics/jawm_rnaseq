@@ -10,7 +10,6 @@
   name: 
     - read_geo
     - prefetch
-    - relabel_geo
     - genome_collector
     - get_erccs
   manager: local
