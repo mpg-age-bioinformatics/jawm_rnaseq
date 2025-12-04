@@ -6,10 +6,11 @@
   manager: slurm
   manager_slurm: { "-p":"cluster,dedicated" }
 
+# - prefetch
+
 - scope: process
   name: 
     - read_geo
-    - prefetch
     - genome_collector
     - get_erccs
   manager: local

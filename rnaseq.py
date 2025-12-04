@@ -194,8 +194,6 @@ if __name__ == "__main__":
         groups=r"\n".join(groups)
 
         jawm.Process.update( var={ "groups" : groups } )
-
-    print(groups)
     
     # usage: 
 
@@ -231,12 +229,14 @@ if __name__ == "__main__":
             jawm.Process.update( var={ "seq_type" : seq_type } )
             var["seq_type"]=seq_type
 
+
+        # output folders ie. genomes and rnaseq
         if not sra_download :
             chars = string.ascii_letters + string.digits
             chars = ''.join(random.choices(chars, k=7))
-            default_location="../jawm_rnaseq_"+chars
+            default_location=os.path.join( os.getcwd(), "jawm_rnaseq_"+chars )
         else:
-            default_location="../jawm_rnaseq_"+sra.read_geo.var["geoacc"]
+            default_location=os.path.join( os.getcwd(), "jawm_rnaseq_"+sra.read_geo.var["geoacc"] )
         
         # output folder
         if "project_folder" not in var :
@@ -266,6 +266,7 @@ if __name__ == "__main__":
         elif not deseq2.annotations.var["biotypes_go"] :
             jawm.Process.update( var={ "mk.biotypes_go_dir" : os.path.dirname( biotypes_go ) } )
             jawm.Process.update( var={ "biotypes_go" : biotypes_go } )
+            print(biotypes_go)
 
         # user's raw data folder
         if not sra_download :
@@ -296,14 +297,14 @@ if __name__ == "__main__":
             # for some samples there might be more than one SRA per sample
             # which we will concatenate
             n_concats=groups.split('\n')
-            n_concats=[ s.split(";")[0] for s in in n_concats ]+[ s.split(";")[1] for s in in n_concats ]
+            n_concats=[ s.split(";")[0] for s in n_concats ]+ [ s.split(";")[1] for s in n_concats ]
             n_concats=[ s for s in n_concats if "," in s ]
             n_concats=len(n_concats)
 
             if n_concats < 5 :
                 preprocess.var["parallel"]=n_concats
                 preprocess.manager="local"
-            elif preprocess.manager="slurm" :
+            elif preprocess.manager=="slurm" :
                 preprocess.var["parallel"]=n_concats
                 preprocess.manager_slurm={"--mem":"20GB", "-t":"1:00:00", "-c":str(n_concats) }
 
@@ -333,7 +334,7 @@ if __name__ == "__main__":
                 prefetch_.var["sraid"]=sraid
                 prefetch_.execute()
 
-                if "parallel_download" not in var:
+                if prefetch_.manager == "local" :
 
                     jawm.Process.wait( prefetch_.hash )
 
@@ -352,7 +353,7 @@ if __name__ == "__main__":
             if n_concats < 5 :
                 sra.relabel_geo.var["parallel"]=n_concats
                 sra.relabel_geo.manager="local"
-            elif sra.relabel_geo.manager="slurm" :
+            elif sra.relabel_geo.manager=="slurm" :
                 sra.relabel_geo.var["parallel"]=n_concats
                 sra.relabel_geo.manager_slurm={"--mem":"20GB", "-t":"1:00:00", "-c":str(n_concats) }
 
@@ -371,9 +372,9 @@ if __name__ == "__main__":
 
         if not all( os.path.isfile(s) for s in read2_files  ) :
             read2_files = [ ]
-            print("Not all Read 1 files have a matching Read 2 file. Treating experiment as single end.")
+            logger.info("Not all Read 1 files have a matching Read 2 file. Treating experiment as single end.")
         else:
-            print("Treating experiment as paired end.")
+            logger.info("Treating experiment as paired end.")
 
         ##########
         # fastqc #
@@ -468,7 +469,7 @@ if __name__ == "__main__":
             "mk.featurecounts_output": os.path.join( var["project_folder"], "featurecounts_output"),
             "map.mapping_folder": os.path.join( var["project_folder"], "kallisto_output"),
             "map.gtf":gtf_file,
-            "map.strand_file":os.path.join( var["project_folder"], "kallisto_output", ".strandness.txt")
+            "map.strand_file":os.path.join( var["project_folder"], "kallisto_output", ".strandness.featurecounts.txt")
         }
 
         jawm.Process.update( var=featurecounts_dic )
