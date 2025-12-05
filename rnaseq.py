@@ -124,6 +124,7 @@ if __name__ == "__main__":
     from pathlib import Path
     import glob
 
+
     #####################
     # load dependencies #
     #####################
@@ -199,7 +200,6 @@ if __name__ == "__main__":
 
     if workflow( ["main","rnaseq","test"], workflows ) :
 
-
         #########################
         # check & set variables #
         #########################
@@ -209,10 +209,15 @@ if __name__ == "__main__":
             if "organism" not in genomes.download_gtf.var :
                 organism=sra.get_unique_sample_organism( sra.read_geo.var["geoacc"] )
                 jawm.Process.update( var={ "organism" : organism } )
+                var["organism"]=organism
             elif not genomes.download_gtf.var["organism"] :
                 organism=sra.get_unique_sample_organism( sra.read_geo.var["geoacc"] )
                 jawm.Process.update( var={ "organism" : organism } )
-            var["organism"]=organism
+                var["organism"]=organism
+
+            # this should not be needed
+            else:
+                var["organism"]=genomes.download_gtf.var["organism"]
 
         # genome release
         if genomes.download_gtf.var["release"] == "last" :
@@ -266,7 +271,6 @@ if __name__ == "__main__":
         elif not deseq2.annotations.var["biotypes_go"] :
             jawm.Process.update( var={ "mk.biotypes_go_dir" : os.path.dirname( biotypes_go ) } )
             jawm.Process.update( var={ "biotypes_go" : biotypes_go } )
-            print(biotypes_go)
 
         # user's raw data folder
         if not sra_download :
@@ -309,7 +313,9 @@ if __name__ == "__main__":
                 preprocess.manager_slurm={"--mem":"20GB", "-t":"1:00:00", "-c":str(n_concats) }
 
             preprocess.execute()
-            jawm.Process.wait( preprocess.hash )
+            # jawm.Process.wait( preprocess.hash )
+
+            preprocess_jobs=[ preprocess.hash ]
         
         else:
 
@@ -345,7 +351,6 @@ if __name__ == "__main__":
 
                 fastq_dump_jobs.append( fastq_dump_.hash )
             
-            jawm.Process.wait( fastq_dump_jobs )
 
             # for some samples there might be more than one SRA per sample
             # which we will concatenate
@@ -357,41 +362,13 @@ if __name__ == "__main__":
                 sra.relabel_geo.var["parallel"]=n_concats
                 sra.relabel_geo.manager_slurm={"--mem":"20GB", "-t":"1:00:00", "-c":str(n_concats) }
 
-            sra.relabel_geo.execute( )
+            sra.relabel_geo.execute( fastq_dump_jobs )
 
-            jawm.Process.wait( sra.relabel_geo.hash )
+            preprocess_jobs= [ sra.relabel_geo.hash ] 
 
-        #################
-        # list raw data #
-        #################
-
-        # list read1 and read2 files
-        read1_files = list(Path( fastqc.fastqc.var["raw_data"] ).glob(f'*{fastqc.fastqc.var["read1_suffix"]}'))
-        read1_files=[ str(s) for s in read1_files if not str(s).startswith("tmp.") ]
-        read2_files = [ str(s).split( var["read1_suffix"] )[0] +var["read2_suffix"] for s in read1_files  ]
-
-        if not all( os.path.isfile(s) for s in read2_files  ) :
-            read2_files = [ ]
-            logger.info("Not all Read 1 files have a matching Read 2 file. Treating experiment as single end.")
-        else:
-            logger.info("Treating experiment as paired end.")
-
-        ##########
-        # fastqc #
-        ##########
-
-        jawm.Process.update( var={ "mk.fastqc_output":os.path.join( var["project_folder"], "fastqc_output" ) } )
-
-        fastqc_jobs=[]
-        for f in read1_files + read2_files :
-            fastqc_=fastqc.fastqc.clone()
-            fastqc_.var["map.f"]=f
-            fastqc_.execute()
-            fastqc_jobs.append(fastqc_.hash)
-
-        ############
-        # kallisto #
-        ############
+        ##################
+        # kallisto index #
+        ##################
 
         gtf_file=os.path.join( 
             var["genomes_folder"], 
@@ -427,6 +404,41 @@ if __name__ == "__main__":
         kallisto.get_erccs.execute( [ genomes.download_gtf.hash, genomes.download_dna.hash ] )
         kallisto.writecdna.execute( kallisto.get_erccs.hash )
         kallisto.indexer.execute( kallisto.writecdna.hash )
+
+
+        #################
+        # list raw data #
+        #################
+
+        jawm.Process.wait( preprocess_jobs )
+
+        # list read1 and read2 files
+        read1_files = list(Path( fastqc.fastqc.var["raw_data"] ).glob(f'*{fastqc.fastqc.var["read1_suffix"]}'))
+        read1_files=[ str(s) for s in read1_files if not str(s).startswith("tmp.") ]
+        read2_files = [ str(s).split( var["read1_suffix"] )[0] +var["read2_suffix"] for s in read1_files  ]
+
+        if not all( os.path.isfile(s) for s in read2_files  ) :
+            read2_files = [ ]
+            logger.info("Not all Read 1 files have a matching Read 2 file. Treating experiment as single end.")
+        else:
+            logger.info("Treating experiment as paired end.")
+
+        ##########
+        # fastqc #
+        ##########
+
+        jawm.Process.update( var={ "mk.fastqc_output":os.path.join( var["project_folder"], "fastqc_output" ) } )
+
+        fastqc_jobs=[]
+        for f in read1_files + read2_files :
+            fastqc_=fastqc.fastqc.clone()
+            fastqc_.var["map.f"]=f
+            fastqc_.execute( preprocess_jobs )
+            fastqc_jobs.append(fastqc_.hash)
+
+        ####################
+        # kallisto mapping #
+        ####################
 
         # check if it is unstranded, 1st strand, or 2nd strand mapping
         kallisto.unstranded_mapping.var["read_1"]=os.path.basename(read1_files[0])
@@ -469,7 +481,7 @@ if __name__ == "__main__":
             "mk.featurecounts_output": os.path.join( var["project_folder"], "featurecounts_output"),
             "map.mapping_folder": os.path.join( var["project_folder"], "kallisto_output"),
             "map.gtf":gtf_file,
-            "map.strand_file":os.path.join( var["project_folder"], "kallisto_output", ".strandness.featurecounts.txt")
+            "map.strand":os.path.join( var["project_folder"], "kallisto_output", ".strandness.featurecounts.txt")
         }
 
         jawm.Process.update( var=featurecounts_dic )
@@ -508,8 +520,8 @@ if __name__ == "__main__":
         ###########
 
         multiqc_dic={
-            "map.fastqc": os.path.join( var["project_folder"], "fastqc_output" ),
-            "map.featurecounts": os.path.join( var["project_folder"], "featurecounts_output" ),
+            "mk.fastqc": os.path.join( var["project_folder"], "fastqc_output" ),
+            "mk.featurecounts": os.path.join( var["project_folder"], "featurecounts_output" ),
             "map.mapping":  os.path.join( var["project_folder"], "kallisto_output" ),
             "mk.multiqc_output": os.path.join( var["project_folder"], "multiqc_output" )
         }
