@@ -1,5 +1,4 @@
-
-# a hpc yaml rnaseq
+# an hpc yaml rnaseq
 - scope: global
   environment: "apptainer"
   environment_apptainer: { "-B":"/nexus:/nexus" }

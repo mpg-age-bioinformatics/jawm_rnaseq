@@ -8,6 +8,36 @@ import logging
 
 logger = logging.getLogger("jawm")
 
+def process_groups( groups, sra_download ) :
+
+    if sra_download :
+        # sra groups are given in the form
+        # <samples list><groups_list> 
+        n=2
+    else:
+        # own data groups are given in the form
+        # <list of read 1 files><list of read 2 files><groups_list> 
+        n=3
+    
+    groups=groups.split("\n")
+    groups=[ s.replace(";","_") for s in groups if s ]
+    size = len(groups) // n
+    groups = [ groups[ i*size : (i+1)*size ] for i in range(n) ]
+
+    if sra_download:
+        samples=groups[0]
+        groups=groups[-1]
+        groups=[ f"{a};{b}" for a, b in zip(samples, groups) ]
+    else:
+        samples=groups[0]
+        samples_=groups[0]
+        groups=groups[-1]
+        groups=[ f"{a};{b};{c}" for a, b, c in zip( samples, samples_, groups ) ]
+
+    groups=r"\n".join(groups)
+
+    return groups
+
 preprocess=jawm.Process( 
     name="preprocess",
     when=lambda p: not os.path.isfile( os.path.join( p.var["raw_data"],"preprocess.touch" ) ) ,
@@ -168,31 +198,7 @@ if __name__ == "__main__":
 
     if args.groups :
 
-        if sra_download :
-            # sra groups are given in the form
-            # <samples list><groups_list> 
-            n=2
-        else:
-            # own data groups are given in the form
-            # <list of read 1 files><list of read 2 files><groups_list> 
-            n=3
-        
-        groups=args.groups.split("\n")
-        groups=[ s.replace(";","_") for s in groups if s ]
-        size = len(groups) // n
-        groups = [ groups[ i*size : (i+1)*size ] for i in range(n) ]
-
-        if sra_download:
-            samples=groups[0]
-            groups=groups[-1]
-            groups=[ f"{a};{b}" for a, b in zip(samples, groups) ]
-        else:
-            samples=groups[0]
-            samples_=groups[0]
-            groups=groups[-1]
-            groups=[ f"{a};{b};{c}" for a, b, c in zip( samples, samples_, groups ) ]
-
-        groups=r"\n".join(groups)
+        groups = process_groups( groups, sra_download )
 
         jawm.Process.update( var={ "groups" : groups } )
     
@@ -214,10 +220,6 @@ if __name__ == "__main__":
                 organism=sra.get_unique_sample_organism( sra.read_geo.var["geoacc"] )
                 jawm.Process.update( var={ "organism" : organism } )
                 var["organism"]=organism
-
-            # this should not be needed
-            else:
-                var["organism"]=genomes.download_gtf.var["organism"]
 
         # genome release
         if genomes.download_gtf.var["release"] == "last" :
@@ -313,7 +315,6 @@ if __name__ == "__main__":
                 preprocess.manager_slurm={"--mem":"20GB", "-t":"1:00:00", "-c":str(n_concats) }
 
             preprocess.execute()
-            # jawm.Process.wait( preprocess.hash )
 
             preprocess_jobs=[ preprocess.hash ]
         
