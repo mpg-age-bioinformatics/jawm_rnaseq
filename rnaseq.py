@@ -198,7 +198,7 @@ if __name__ == "__main__":
 
     if args.groups :
 
-        groups = process_groups( groups, sra_download )
+        groups = process_groups( args.groups, sra_download )
 
         jawm.Process.update( var={ "groups" : groups } )
     
