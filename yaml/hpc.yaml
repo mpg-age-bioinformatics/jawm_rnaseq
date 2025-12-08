@@ -4,6 +4,9 @@
   environment_apptainer: { "-B":"/nexus:/nexus" }
   manager: slurm
   manager_slurm: { "-p":"cluster,dedicated" }
+  var:
+    email : "jboucas@gmail.com"
+    api_key : "c372dc042b975ef2047212a8e4d4d4e9fc08"
 
 - scope: process
   name: 
