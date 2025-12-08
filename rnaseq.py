@@ -51,12 +51,20 @@ import pandas as pd
 import shutil
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
-def concat_gz_files(files, output):
-    with gzip.open(output, "wt") as outfile:
-        for fname in files:
-            with gzip.open(fname, "rt") as infile:
-                for line in infile:
-                    outfile.write(line)
+def concat_gz_files( files, output, concat="{{concat}}" ):
+
+    if concat == "text": 
+        with gzip.open(output, "wt") as outfile :
+            for fname in files:
+                with gzip.open(fname, "rt") as infile :
+                    for line in infile:
+                        outfile.write(line)
+
+    elif concat == "stream" :
+        with open(output, "wb") as outfile :
+            for fname in files:
+                with open(fname, "rb") as infile :
+                    shutil.copyfileobj(infile, outfile, length=1024 * 1024)
 
 def add_rep_suffix(groups):
     counts = {}
@@ -137,9 +145,11 @@ with ProcessPoolExecutor(max_workers=int({{parallel}}) ) as executor:
 Path(os.path.join(dest_folder, "preprocess.touch")).touch()
 """,
     var={
-        "parallel": 4
+        "parallel": 4,
+        "concat":"stream"
     },
     desc={
+        "concat": "'stream or text for how you want to concat fastq.gz files when multiple files per sample exist. Default='stream' ",
         "groups": "A dictionary like structure '<file_read_1>:<file_read_2>:<group_name>;<file_read_1>:<file_read_2>:<group_name>;..' ",
         "source_folder": "Folder where the data is currently located.",
         "raw_data":"Samples with multiple runs will be concatenated into one file an located to this folder. Sample with only one file will be symlinked to this folder.", 
@@ -153,7 +163,10 @@ if __name__ == "__main__":
     from jawm.utils import workflow, load_modules, get_image, id_files
     from pathlib import Path
     import glob
+    from datetime import datetime
 
+    # Start timestamp
+    start = datetime.now()
 
     #####################
     # load dependencies #
@@ -208,7 +221,8 @@ if __name__ == "__main__":
 
         # organism
         if sra_download and "organism" not in var :
-            organism=sra.get_unique_sample_organism( var["acc"] )
+            
+            organism=sra.get_unique_sample_organism( var["acc"] )#, email=var.get("email", None), api_key=var.get("api_key", None) )
             jawm.Process.update( var={ "organism" : organism } )
             var["organism"]=organism
 
@@ -465,14 +479,17 @@ if __name__ == "__main__":
             "mk.featurecounts_output": os.path.join( var["project_folder"], "featurecounts_output"),
             "map.mapping_folder": os.path.join( var["project_folder"], "kallisto_output"),
             "map.gtf":gtf_file,
-            "map.strand":os.path.join( var["project_folder"], "kallisto_output", ".strandness.featurecounts.txt")
-        }
+            "map.strand":os.path.join( var["project_folder"], "kallisto_output", ".strandness.featurecounts.txt"),
+            #"strand":os.path.join( var["project_folder"], "kallisto_output", ".strandness.featurecounts.txt" )
+            }
 
         jawm.Process.update( var=featurecounts_dic )
 
         # run jobs
 
         id_bams=id_files( os.path.join( var["project_folder"], "kallisto_output") )
+        id_bams={k: v for k, v in id_bams.items() if not k.startswith("tmp.")}
+
         feature_counts_jobs=[]
 
         for pair_id in id_bams.keys() :
@@ -612,5 +629,19 @@ if __name__ == "__main__":
         # for the test workflow we also do something more (just for rnaseq)
         print("Test completed.")
 
+    jawm.Process.wait( )
+
+    # End timestamp
+    end = datetime.now()
+
+    # Compute elapsed time
+    elapsed = end - start
+
+    # Convert to days, hours, minutes
+    days = elapsed.days
+    hours, remainder = divmod(elapsed.seconds, 3600)
+    minutes, _ = divmod(remainder, 60)
+
+    logger.info(f"Elapsed time: {days}d {hours}h {minutes}m")
 
     sys.exit(0)
