@@ -7,7 +7,7 @@
 
 - scope: process
   name: 
-    - read_geo
+    - read_acc
     - download_gtf
     - download_dna
     - get_erccs

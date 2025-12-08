@@ -145,7 +145,7 @@ Path(os.path.join(dest_folder, "preprocess.touch")).touch()
         "raw_data":"Samples with multiple runs will be concatenated into one file an located to this folder. Sample with only one file will be symlinked to this folder.", 
         "copy": "If True it will it will copy the original raw data file into its new location instead of creating symbolic links."
     },
-    container="mpgagebioinformatics/agepy:50ce16b",
+    container="mpgagebioinformatics/agepy:c86b819",
 )
 
 if __name__ == "__main__":
@@ -181,29 +181,25 @@ if __name__ == "__main__":
     ##################
 
     workflows, var, args, unknown_args= jawm.utils.parse_arguments(["main","rnaseq","test"], extra_args={
-        "--geo": "A GEO acession number of the form GSE129642.",
+        "--acc": "A GEO accession number of the form GSE129642 or an SRA BioProject accession number of the form PRJNA532357.",
         "--groups" : "A table of the form geo acession number, sample id, group",
         })
 
-    if args.geo :
+    if args.acc :
         jawm.Process.update( var={
-            "geoacc" : args.geo,
+            "acc" : args.acc,
             } )
+        var["acc"]=args.acc
 
-    # all geo analysis must have sra.read_geo.var["geoacc"] defined
-    sra_download=False
-    if "geoacc" in sra.read_geo.var :
-        if sra.read_geo.var["geoacc"] :
-            sra_download=True
+    # all geo/sra analysis must have var["acc"] defined
+    sra_download = bool(var.get("acc"))
 
     if args.groups :
-
         groups = process_groups( args.groups, sra_download )
-
         jawm.Process.update( var={ "groups" : groups } )
     
-    # usage: 
 
+    # usage: 
     if workflow( ["main","rnaseq","test"], workflows ) :
 
         #########################
@@ -211,31 +207,22 @@ if __name__ == "__main__":
         #########################
 
         # organism
-        if sra_download :
-            if "organism" not in genomes.download_gtf.var :
-                organism=sra.get_unique_sample_organism( sra.read_geo.var["geoacc"] )
-                jawm.Process.update( var={ "organism" : organism } )
-                var["organism"]=organism
-            elif not genomes.download_gtf.var["organism"] :
-                organism=sra.get_unique_sample_organism( sra.read_geo.var["geoacc"] )
-                jawm.Process.update( var={ "organism" : organism } )
-                var["organism"]=organism
+        if sra_download and "organism" not in var :
+            organism=sra.get_unique_sample_organism( var["acc"] )
+            jawm.Process.update( var={ "organism" : organism } )
+            var["organism"]=organism
 
         # genome release
-        if genomes.download_gtf.var["release"] == "last" :
+        if var.get("release") in (None, "last"):
             release=genomes.get_latest_ensembl_release()
             jawm.Process.update( var={ "release" : release } )
             var["release"]=release
 
         # seq type: primary_assembly vs. toplevel (preference for primary_assembly )
-        seq_type=genomes.check_primary_assembly_exists( genomes.download_dna.var['organism'], genomes.download_dna.var['release'] )
-        if "seq_type" not in genomes.download_dna.var :
+        if "seq_type" not in var :
+            seq_type=genomes.check_primary_assembly_exists( var['organism'], var['release'] )
             jawm.Process.update( var={ "seq_type" : seq_type } )
             var["seq_type"]=seq_type
-        elif not genomes.download_dna.var["seq_type"] :
-            jawm.Process.update( var={ "seq_type" : seq_type } )
-            var["seq_type"]=seq_type
-
 
         # output folders ie. genomes and rnaseq
         if not sra_download :
@@ -243,7 +230,7 @@ if __name__ == "__main__":
             chars = ''.join(random.choices(chars, k=7))
             default_location=os.path.join( os.getcwd(), "jawm_rnaseq_"+chars )
         else:
-            default_location=os.path.join( os.getcwd(), "jawm_rnaseq_"+sra.read_geo.var["geoacc"] )
+            default_location=os.path.join( os.getcwd(), "jawm_rnaseq_"+sra.read_acc.var["acc"] )
         
         # output folder
         if "project_folder" not in var :
@@ -266,18 +253,14 @@ if __name__ == "__main__":
             var["genomes_folder"]=default_location
 
         # BioMart biotypes and go annotation file
-        biotypes_go = os.path.join( var["genomes_folder"], var["organism"], var["release"], "biotypes_go.txt" )
-        if "biotypes_go" not in deseq2.annotations.var :
-            jawm.Process.update( var={ "mk.biotypes_go_dir" : os.path.dirname( biotypes_go ) } )
-            jawm.Process.update( var={ "biotypes_go" : biotypes_go } )
-        elif not deseq2.annotations.var["biotypes_go"] :
+        if "biotypes_go" not in var :
+            biotypes_go = os.path.join( var["genomes_folder"], var["organism"], var["release"], "biotypes_go.txt" )
             jawm.Process.update( var={ "mk.biotypes_go_dir" : os.path.dirname( biotypes_go ) } )
             jawm.Process.update( var={ "biotypes_go" : biotypes_go } )
 
         # user's raw data folder
-        if not sra_download :
-            if not "source_folder" not in var:
-                jawm.Process.update( var={ "source_folder" : "./" } )
+        if ( not sra_download ) and ( "source_folder" not in var ) :
+            jawm.Process.update( var={ "source_folder" : "./" } )
 
         jawm.Process.update( var={
             "read1_suffix" : ".read_1.fastq.gz",
@@ -300,7 +283,7 @@ if __name__ == "__main__":
             # local data #
             ##############
 
-            # for some samples there might be more than one SRA per sample
+            # for some samples there might be more than one file per read
             # which we will concatenate
             n_concats=groups.split('\n')
             n_concats=[ s.split(";")[0] for s in n_concats ]+ [ s.split(";")[1] for s in n_concats ]
@@ -324,11 +307,11 @@ if __name__ == "__main__":
             # download data from sra #
             ##########################    
                     
-            sra.read_geo.execute()
-            jawm.Process.wait( sra.read_geo.hash )
+            sra.read_acc.execute()
+            jawm.Process.wait( sra.read_acc.hash )
 
-            input_xlsx=os.path.join( sra.read_geo.var["raw_data"], f"{sra.read_geo.var['geoacc']}.samples.xlsx"  )
-            input_tsv=os.path.join( sra.read_geo.var["raw_data"], f"{sra.read_geo.var['geoacc']}.samples.tsv"  )
+            input_xlsx=os.path.join( sra.read_acc.var["raw_data"], f"{sra.read_acc.var['acc']}.samples.xlsx"  )
+            input_tsv=os.path.join( sra.read_acc.var["raw_data"], f"{sra.read_acc.var['acc']}.samples.tsv"  )
 
             df=pd.read_excel( input_xlsx )
             sra_ids=df["Run"].tolist()
@@ -418,11 +401,11 @@ if __name__ == "__main__":
         read1_files=[ str(s) for s in read1_files if not str(s).startswith("tmp.") ]
         read2_files = [ str(s).split( var["read1_suffix"] )[0] +var["read2_suffix"] for s in read1_files  ]
 
-        if not all( os.path.isfile(s) for s in read2_files  ) :
-            read2_files = [ ]
-            logger.info("Not all Read 1 files have a matching Read 2 file. Treating experiment as single end.")
-        else:
-            logger.info("Treating experiment as paired end.")
+        # if not all( os.path.isfile(s) for s in read2_files  ) :
+        #     read2_files = [ ]
+        #     logger.info("Not all Read 1 files have a matching Read 2 file. Treating experiment as single end.")
+        # else:
+        #     logger.info("Treating experiment as paired end.")
 
         ##########
         # fastqc #
@@ -487,25 +470,26 @@ if __name__ == "__main__":
 
         jawm.Process.update( var=featurecounts_dic )
 
-        if read2_files:
-            featurecounts.geneid.var["paired"]="-p"
-            featurecounts.biotype.var["paired"]="-p"
-
         # run jobs
 
         id_bams=id_files( os.path.join( var["project_folder"], "kallisto_output") )
         feature_counts_jobs=[]
 
-        for pair_id in id_bams.keys() : 
+        for pair_id in id_bams.keys() :
 
             geneid_=featurecounts.geneid.clone()
             geneid_.var["pair_id"]=pair_id
             geneid_.var["map.bam"]=id_bams[pair_id][0]
-            geneid_.execute( flagstat_jobs )
 
             biotype_=featurecounts.biotype.clone()
             biotype_.var["pair_id"]=pair_id
             biotype_.var["map.bam"]=id_bams[pair_id][0]
+
+            if os.path.isfile( os.path.join( fastqc.fastqc.var["raw_data"], pair_id+var["read2_suffix"] ) ) :
+                geneid_.var["paired"]="-p"
+                biotype_.var["paired"]="-p"
+
+            geneid_.execute( flagstat_jobs )
             biotype_.execute( flagstat_jobs )
             
             feature_counts_jobs = feature_counts_jobs + [ geneid_.hash, biotype_.hash ]
