@@ -1,12 +1,13 @@
 # an hpc yaml rnaseq
 - scope: global
   environment: "apptainer"
+  automated_mount: False
   environment_apptainer: { "-B":"/nexus:/nexus" }
   manager: slurm
   manager_slurm: { "-p":"cluster,dedicated" }
-  var:
-    email : "jboucas@gmail.com"
-    api_key : "c372dc042b975ef2047212a8e4d4d4e9fc08"
+  # before_script: "module load apptainer"
+  # manager_slurm: {"--ntasks-per-core":"2", "-p":"general,small" }
+  parallel: True
 
 - scope: process
   name: 

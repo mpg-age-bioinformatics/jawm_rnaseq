@@ -1,11 +1,9 @@
 # a docker yaml rnaseq
 - scope: global
   environment: "docker"
+  parallel: false
   var:
-    source_folder: "./test/test-input"
-    mk.raw_data: "./test/test-output/raw_data"
-    read1_suffix: ".read_1.fastq.gz"
-    read2_suffix: ".read_2.fastq.gz"
+    # source_folder: "./test/test-input"
     # groups:
     #   daf2_treated.Rep_1.READ_1.fastq.gz;;daf2_treated\n
     #   daf2_treated.Rep_2.READ_1.fastq.gz;;daf2_treated\n
@@ -19,13 +17,21 @@
     #   N2.Rep_1.READ_1.fastq.gz;;N2_untreated\n
     #   N2.Rep_2.READ_1.fastq.gz;;N2_untreated\n
     #   N2.Rep_3.READ_1.fastq.gz;;N2_untreated
-    geoacc: GSE129642
+    acc: PRJNA532357
     groups:
-      GSM3717989;WT-L4\n
-      GSM3717990;WT-L4\n
-      GSM3717991;sftb-1\n
-      GSM3717992;sftb-1
-# - scope: process
-#   name: fastqc
-#   var:
-#     mk.raw_data: "./test/test-output/raw_data"
+      SRX5667943;WT-L4\n
+      SRX5667944;WT-L4\n
+      SRX5667945;sftb-1 (cer3/7)\n
+      SRX5667946;sftb-1 (cer3/7)\n
+      SRX5667947;WT-L2\n
+      SRX5667947;WT-L2\n
+      SRX5667948;WT-L2\n
+      SRX5667948;WT-L2\n
+      SRX5667949;sftb-1 (cer39)\n
+      SRX5667949;sftb-1 (cer39)\n
+      SRX5667950;sftb-1 (cer39)\n
+      SRX5667950;sftb-1 (cer39)\n
+      SRX5667951;sftb-1 (cer6)\n
+      SRX5667951;sftb-1 (cer6)\n
+      SRX5667952;sftb-1 (cer6)\n
+      SRX5667952;sftb-1 (cer6)
