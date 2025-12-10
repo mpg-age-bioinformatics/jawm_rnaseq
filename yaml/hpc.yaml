@@ -21,7 +21,7 @@
 - scope: process
   name: fastqc
   var:
-    ncores: 4
+    cpus: 4
 
 - scope: process
   name: 
