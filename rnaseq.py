@@ -220,6 +220,7 @@ if __name__ == "__main__":
             # for some samples there might be more than one SRA per sample
             # which we will concatenate
             n_concats=sra.get_nconcatenations( input_tsv )
+
             if n_concats < 5 :
                 sra.relabel_sra.var["parallel"]=n_concats
                 sra.relabel_sra.manager="local"
@@ -228,7 +229,7 @@ if __name__ == "__main__":
                     if n_concats > int(var["max_concats"] ) :
                         n_concats=int(var["max_concats"] ) 
                 sra.relabel_sra.var["parallel"]=n_concats
-                sra.relabel_sra.manager_slurm={"--mem":"20GB", "-t":"1:00:00", "-c":str(n_concats) }
+                sra.relabel_sra.manager_slurm.update(  {"--mem":"20GB", "-t":"1:00:00", "-c":str(n_concats) } )
 
             sra.relabel_sra.execute( fastq_dump_jobs )
 
