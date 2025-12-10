@@ -11,6 +11,7 @@
 
 - scope: process
   name: 
+    - download_link
     - read_acc
     - download_gtf
     - download_dna

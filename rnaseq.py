@@ -1,169 +1,19 @@
 import jawm
-import os
-import re
-import pandas as pd
-import random
-import string
 import logging
 
 logger = logging.getLogger("jawm")
 
-def process_groups( groups, sra_download ) :
-
-    if sra_download :
-        # sra groups are given in the form
-        # <samples list><groups_list> 
-        n=2
-    else:
-        # own data groups are given in the form
-        # <list of read 1 files><list of read 2 files><groups_list> 
-        n=3
-    
-    groups=groups.split("\n")
-    groups=[ s.replace(";","_") for s in groups if s ]
-    size = len(groups) // n
-    groups = [ groups[ i*size : (i+1)*size ] for i in range(n) ]
-
-    if sra_download:
-        samples=groups[0]
-        groups=groups[-1]
-        groups=[ f"{a};{b}" for a, b in zip(samples, groups) ]
-    else:
-        samples=groups[0]
-        samples_=groups[0]
-        groups=groups[-1]
-        groups=[ f"{a};{b};{c}" for a, b, c in zip( samples, samples_, groups ) ]
-
-    groups=r"\n".join(groups)
-
-    return groups
-
-preprocess=jawm.Process( 
-    name="preprocess",
-    when=lambda p: not os.path.isfile( os.path.join( p.var["raw_data"],"preprocess.touch" ) ) ,
-    script="""#!/usr/bin/env python3
-import os
-import gzip
-import AGEpy as age
-import re
-from pathlib import Path
-import pandas as pd
-import shutil
-from concurrent.futures import ProcessPoolExecutor, as_completed
-
-def concat_gz_files( files, output, concat="{{concat}}" ):
-
-    if concat == "text": 
-        with gzip.open(output, "wt") as outfile :
-            for fname in files:
-                with gzip.open(fname, "rt") as infile :
-                    for line in infile:
-                        outfile.write(line)
-
-    elif concat == "stream" :
-        with open(output, "wb") as outfile :
-            for fname in files:
-                with open(fname, "rb") as infile :
-                    shutil.copyfileobj(infile, outfile, length=1024 * 1024)
-
-def add_rep_suffix(groups):
-    counts = {}
-    output = []
-    for g in groups:
-        counts[g] = counts.get(g, 0) + 1
-        output.append(f"rep_{counts[g]}")
-    return output
-
-groups = "{{groups}}".replace("\\x01", "" )
-groups = groups.strip().strip(";")
-groups = re.sub(r'\s*([;])\s*', r'\\1', groups)
-groups = [s.split(";") for s in groups.split("\\n")]
-groups = pd.DataFrame(groups, columns=["file_1", "file_2", "group"])
-groups["group"] = groups["group"].apply(lambda x: age.safe_filename(x))
-groups["rep"] = add_rep_suffix(groups["group"])
-
-source_folder = "{{source_folder}}"
-dest_folder = "{{raw_data}}"
-
-if not os.path.isdir(dest_folder):
-    os.makedirs(dest_folder)
-
-# We'll collect all concat jobs and run them with max 4 workers
-futures = []
-
-with ProcessPoolExecutor(max_workers=int({{parallel}}) ) as executor:
-    for i in groups.index.tolist():
-        source_files_1 = groups.loc[i, "file_1"]
-        source_files_2 = groups.loc[i, "file_2"]
-
-        group = groups.loc[i, "group"]
-        rep = groups.loc[i, "rep"]
-
-        dest_path_1 = os.path.join(dest_folder, f"{group}.{rep}.read_1.fastq.gz")
-        dest_path_2 = os.path.join(dest_folder, f"{group}.{rep}.read_2.fastq.gz")
-
-        if os.path.exists(dest_path_1):
-            print(f"{dest_path_1} already exists. File will not be overwritten. Using existing files.")
-            continue
-
-        # ---- Single-run case: just symlink/copy, no need for pool ----
-        if "," not in source_files_1:
-            # deal with one run per sample first
-            source_name_1 = source_files_1
-            source_path_1 = os.path.join(source_folder, source_files_1)
-
-            if str("{{copy}}").lower() != "true":
-                os.symlink(source_path_1, dest_path_1)
-            else:
-                shutil.copy2(source_path_1, dest_path_1)
-
-            if source_files_2:
-                source_name_2 = source_files_2
-                source_path_2 = os.path.join(source_folder, source_files_2)
-
-                if str("{{copy}}").lower() != "true":
-                    os.symlink(source_path_2, dest_path_2)
-                else:
-                    # NOTE: this used to copy source_path_1 by mistake
-                    shutil.copy2(source_path_2, dest_path_2)
-
-        # ---- Multi-run case: schedule concatenations in the pool ----
-        else:
-            # now deal with concatenations
-            source_name_1 = [os.path.join(source_folder, s) for s in source_files_1.split(",")]
-            futures.append(executor.submit(concat_gz_files, source_name_1, dest_path_1))
-
-            if source_files_2:
-                source_name_2 = [os.path.join(source_folder, s) for s in source_files_2.split(",")]
-                futures.append(executor.submit(concat_gz_files, source_name_2, dest_path_2))
-
-    # Wait for all concatenations to finish and raise exceptions if any
-    for fut in as_completed(futures):
-        fut.result()
-
-# Only touch the file once everything is done
-Path(os.path.join(dest_folder, "preprocess.touch")).touch()
-""",
-    var={
-        "parallel": 4,
-        "concat":"stream"
-    },
-    desc={
-        "concat": "'stream or text for how you want to concat fastq.gz files when multiple files per sample exist. Default='stream' ",
-        "groups": "A dictionary like structure '<file_read_1>:<file_read_2>:<group_name>;<file_read_1>:<file_read_2>:<group_name>;..' ",
-        "source_folder": "Folder where the data is currently located.",
-        "raw_data":"Samples with multiple runs will be concatenated into one file an located to this folder. Sample with only one file will be symlinked to this folder.", 
-        "copy": "If True it will it will copy the original raw data file into its new location instead of creating symbolic links."
-    },
-    container="mpgagebioinformatics/agepy:c86b819",
-)
-
 if __name__ == "__main__":
     import sys
+    import os
     from jawm.utils import workflow, load_modules, get_image, id_files
     from pathlib import Path
     import glob
+    import string
+    import random
     from datetime import datetime
+    import csv
+
 
     # Start timestamp
     start = datetime.now()
@@ -173,6 +23,7 @@ if __name__ == "__main__":
     #####################
 
     load_modules([
+        "submodules",
         "jawm_sra",
         "jawm_fastqc",
         "jawm_genomes",
@@ -181,7 +32,6 @@ if __name__ == "__main__":
         "jawm_multiqc",
         "jawm_deseq2",
         ])
-
 
     ############################
     # download required images #
@@ -208,9 +58,9 @@ if __name__ == "__main__":
     sra_download = bool(var.get("acc"))
 
     if args.groups :
-        groups = process_groups( args.groups, sra_download )
+        groups = _rnaseq.process_groups( args.groups, sra_download )
         jawm.Process.update( var={ "groups" : groups } )
-    
+        var["groups"]=groups
 
     # usage: 
     if workflow( ["main","rnaseq","test"], workflows ) :
@@ -220,7 +70,7 @@ if __name__ == "__main__":
         #########################
 
         # organism
-        if sra_download and "organism" not in var :
+        if sra_download and ( "organism" not in var ) :
             
             organism=sra.get_unique_sample_organism( var["acc"] )#, email=var.get("email", None), api_key=var.get("api_key", None) )
             jawm.Process.update( var={ "organism" : organism } )
@@ -274,7 +124,10 @@ if __name__ == "__main__":
 
         # user's raw data folder
         if ( not sra_download ) and ( "source_folder" not in var ) :
-            jawm.Process.update( var={ "source_folder" : "./" } )
+            if "download_link" not in var :
+                jawm.Process.update( var={ "mk.source_folder" : "./" } )
+            else:
+                jawm.Process.update( var={ "mk.source_folder" :  os.path.join( var["project_folder"], "downloads"  ) }) 
 
         jawm.Process.update( var={
             "read1_suffix" : ".read_1.fastq.gz",
@@ -297,38 +150,52 @@ if __name__ == "__main__":
             # local data #
             ##############
 
+            if "download_link" in var :
+                _rnaseq.download_link.execute()
+
+                # special handling of samples from the Cologne Center for Genomics
+                if ( "fastq.gz" not in var["groups"] ) and ("fq.gz" not in var["groups"]) and ( "delivery.ccg.uni-koeln.de" in var["download_link"] ) :
+                    jawm.Process.wait( _rnaseq.download_link.hash )
+                    groups=_rnaseq.ccg_samples( groups, source_folder )
+                    jawm.Process.update( var={ "groups" : groups } )
+                    var["groups"]=groups
+
             # for some samples there might be more than one file per read
             # which we will concatenate
-            n_concats=groups.split('\n')
+            n_concats=var["groups"].split('\n')
             n_concats=[ s.split(";")[0] for s in n_concats ]+ [ s.split(";")[1] for s in n_concats ]
             n_concats=[ s for s in n_concats if "," in s ]
             n_concats=len(n_concats)
 
             if n_concats < 5 :
-                preprocess.var["parallel"]=n_concats
-                preprocess.manager="local"
-            elif preprocess.manager=="slurm" :
-                preprocess.var["parallel"]=n_concats
-                preprocess.manager_slurm={"--mem":"20GB", "-t":"1:00:00", "-c":str(n_concats) }
+                _rnaseq.preprocess.var["parallel"]=n_concats
+                _rnaseq.preprocess.manager="local"
+            elif _rnaseq.preprocess.manager=="slurm" :
+                _rnaseq.preprocess.var["parallel"]=n_concats
+                _rnaseq.preprocess.manager_slurm={"--mem":"20GB", "-t":"1:00:00", "-c":str(n_concats) }
 
-            preprocess.execute()
+            _rnaseq.preprocess.execute( _rnaseq.download_link.hash )
 
-            preprocess_jobs=[ preprocess.hash ]
+            preprocess_jobs=[ _rnaseq.preprocess.hash ]
         
         else:
 
             ##########################
             # download data from sra #
-            ##########################    
+            ##########################
                     
             sra.read_acc.execute()
             jawm.Process.wait( sra.read_acc.hash )
 
-            input_xlsx=os.path.join( sra.read_acc.var["raw_data"], f"{sra.read_acc.var['acc']}.samples.xlsx"  )
+            # input_xlsx=os.path.join( sra.read_acc.var["raw_data"], f"{sra.read_acc.var['acc']}.samples.xlsx"  )
             input_tsv=os.path.join( sra.read_acc.var["raw_data"], f"{sra.read_acc.var['acc']}.samples.tsv"  )
 
-            df=pd.read_excel( input_xlsx )
-            sra_ids=df["Run"].tolist()
+            sra_ids = []
+
+            with open(input_tsv, newline="") as f:
+                reader = csv.DictReader(f, delimiter="\t")
+                for row in reader:
+                    sra_ids.append(row["Run"])
 
             fastq_dump_jobs=[]
             for sraid in sra_ids : 
@@ -557,6 +424,13 @@ if __name__ == "__main__":
 
         deseq2_jobs=[]
 
+        deseq2.mastertable.execute( )
+        deseq2_jobs.append( deseq2.mastertable.hash )
+
+        if workflow( ["mastertable"], workflows ) :
+            jawm.Process.wait()
+            sys.exit()
+
         for file in tests:
 
             # clone the processes required for each file
@@ -567,8 +441,7 @@ if __name__ == "__main__":
 
             deseq2_jobs.append( deseq2_.hash )
         
-        deseq2.mastertable.execute( )
-        deseq2_jobs.append( deseq2.mastertable.hash )
+
 
         deseq2.annotator.execute( deseq2_jobs )
 
@@ -623,13 +496,28 @@ if __name__ == "__main__":
 
         deseq2.qc_plots.execute( )
 
+    # wait for all jobs to finish
+    jawm.Process.wait( )
+
+    # list most relevant files
+    report_file=os.path.join( var["project_folder"], "report_file.txt" )
+    if not os.path.isfile(report_file):
+        report={}
+        report.update( fastqc.report_files( fastqc.fastqc.var["fastqc_output"] ) )
+        report.update( multiqc.report_files( multiqc.multiqc.var["multiqc_output"] ) )    
+        report.update( deseq2.report_files( deseq2.deseq2.var["deseq2_output"] ) )
+
+        with open(report_file, "w") as f :
+            for folder, file_list in report.items() :
+                for file in file_list :
+                    f.write(f"{folder} {file}\n")
+    else:
+        logger.warning(
+            f"Skipping report file as it already exists: {report_file}")
 
     if workflow( "test", workflows ) :
-
         # for the test workflow we also do something more (just for rnaseq)
-        print("Test completed.")
-
-    jawm.Process.wait( )
+        logger.info("Test completed.")
 
     # End timestamp
     end = datetime.now()
