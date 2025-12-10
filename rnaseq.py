@@ -57,13 +57,18 @@ if __name__ == "__main__":
     # all geo/sra analysis must have var["acc"] defined
     sra_download = bool(var.get("acc"))
 
-    if args.groups :
-        groups = _rnaseq.process_groups( args.groups, sra_download )
+    if args.groups or os.path.isfile( var["groups"] ) :
+        if not args.groups :
+            groups=var["groups"]
+        else:
+            groups=args.groups
+
+        groups = _rnaseq.process_groups( groups, sra_download )
         jawm.Process.update( var={ "groups" : groups } )
         var["groups"]=groups
 
     # usage: 
-    if workflow( ["main","rnaseq","test"], workflows ) :
+    if workflow( ["main","rnaseq","test", "mastertable" ], workflows ) :
 
         #########################
         # check & set variables #
@@ -266,8 +271,8 @@ if __name__ == "__main__":
         genomes.download_dna.execute()
         
         # generate indexes
-        kallisto.get_erccs.execute( [ genomes.download_gtf.hash, genomes.download_dna.hash ] )
-        kallisto.writecdna.execute( kallisto.get_erccs.hash )
+        kallisto.get_genome.execute( [ genomes.download_gtf.hash, genomes.download_dna.hash ] )
+        kallisto.writecdna.execute( kallisto.get_genome.hash )
         kallisto.indexer.execute( kallisto.writecdna.hash )
 
 
@@ -309,7 +314,7 @@ if __name__ == "__main__":
         kallisto.unstranded_mapping.var["read_1"]=os.path.basename(read1_files[0])
         kallisto.unstranded_mapping.execute( kallisto.indexer.hash )
         
-        kallisto.gene_model.execute( kallisto.get_erccs.hash )
+        kallisto.gene_model.execute( kallisto.get_genome.hash )
         
         kallisto.infer_experiment.var["read_1"]=os.path.basename( read1_files[0] )
         kallisto.infer_experiment.execute( [ kallisto.gene_model.hash, kallisto.unstranded_mapping.hash ] )
