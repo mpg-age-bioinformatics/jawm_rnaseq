@@ -113,13 +113,8 @@ if __name__ == "__main__":
 
         # genomes folder
         if "genomes_folder" not in var:
-            logger.info(f"Genomes folder: {default_location}")
-            if os.path.isdir(default_location) :
-                logger.warning(f"{default_location} already exists.")
-            else:
-                os.makedirs(default_location)
-            jawm.Process.update( var={ "map.genomes_folder" : default_location } )
-            var["genomes_folder"]=default_location
+            jawm.Process.update( var={ "map.genomes_folder" : var["project_folder"] } )
+            var["genomes_folder"]= var["project_folder"]
 
         # BioMart biotypes and go annotation file
         if "biotypes_go" not in var :
