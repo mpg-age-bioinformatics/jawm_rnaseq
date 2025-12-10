@@ -80,7 +80,7 @@ def load_table(file_path, n):
         else :
             df=df[ cols[:n] ]
 
-    return df.to_csv(sep=";", index=False, header=False, lineterminator="\\n").rstrip("\n")
+    return df.to_csv(sep=";", index=False, header=False ).rstrip("\n").replace("\n", r"\n")
 
 
 def process_groups( groups, sra_download ) :
