@@ -43,7 +43,7 @@ if __name__ == "__main__":
     # read arguments #
     ##################
 
-    workflows, var, args, unknown_args= jawm.utils.parse_arguments(["main","rnaseq","test"], extra_args={
+    workflows, var, args, unknown_args= jawm.utils.parse_arguments(["main","rnaseq","test", "mastertable"], extra_args={
         "--acc": "A GEO accession number of the form GSE129642 or an SRA BioProject accession number of the form PRJNA532357.",
         "--groups" : "A table of the form geo acession number, sample id, group",
         })
