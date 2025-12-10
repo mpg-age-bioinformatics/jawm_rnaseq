@@ -226,15 +226,15 @@ if __name__ == "__main__":
             # which we will concatenate
             n_concats=sra.get_nconcatenations( input_tsv )
             if n_concats < 5 :
-                sra.relabel_geo.var["parallel"]=n_concats
-                sra.relabel_geo.manager="local"
-            elif sra.relabel_geo.manager=="slurm" :
-                sra.relabel_geo.var["parallel"]=n_concats
-                sra.relabel_geo.manager_slurm={"--mem":"20GB", "-t":"1:00:00", "-c":str(n_concats) }
+                sra.relabel_sra.var["parallel"]=n_concats
+                sra.relabel_sra.manager="local"
+            elif sra.relabel_sra.manager=="slurm" :
+                sra.relabel_sra.var["parallel"]=n_concats
+                sra.relabel_sra.manager_slurm={"--mem":"20GB", "-t":"1:00:00", "-c":str(n_concats) }
 
-            sra.relabel_geo.execute( fastq_dump_jobs )
+            sra.relabel_sra.execute( fastq_dump_jobs )
 
-            preprocess_jobs= [ sra.relabel_geo.hash ] 
+            preprocess_jobs= [ sra.relabel_sra.hash ] 
 
         ##################
         # kallisto index #
