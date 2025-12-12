@@ -231,6 +231,7 @@ if __name__ == "__main__":
                         n_concats=int(var["max_concats"] )
                 else:
                      n_concats=10
+
                 sra.relabel_sra.var["parallel"]=n_concats
                 sra.relabel_sra.manager_slurm.update(  {"--mem":"20GB", "-t":"1:00:00", "-c":str(n_concats) } )
 

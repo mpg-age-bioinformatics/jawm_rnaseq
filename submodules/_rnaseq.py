@@ -202,7 +202,12 @@ if not os.path.isdir(dest_folder):
 # We'll collect all concat jobs and run them with max 4 workers
 futures = []
 
-with ProcessPoolExecutor(max_workers=int({{parallel}}) ) as executor:
+if int({{parallel}}) == 0 :
+    w=1
+else:
+    w=int({{parallel}})
+
+with ProcessPoolExecutor(max_workers=w  ) as executor:
     for i in groups.index.tolist():
         source_files_1 = groups.loc[i, "file_1"]
         source_files_2 = groups.loc[i, "file_2"]
