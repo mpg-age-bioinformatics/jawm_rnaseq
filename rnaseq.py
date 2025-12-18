@@ -150,8 +150,10 @@ if __name__ == "__main__":
             # local data #
             ##############
 
+            download_jobs=[]
             if "download_link" in var :
                 _rnaseq.download_link.execute()
+                download_jobs.append( _rnaseq.download_link.hash ) 
 
                 # special handling of samples from the Cologne Center for Genomics
                 if ( "fastq.gz" not in var["groups"] ) and ("fq.gz" not in var["groups"]) and ( "delivery.ccg.uni-koeln.de" in var["download_link"] ) :
@@ -174,7 +176,7 @@ if __name__ == "__main__":
                 _rnaseq.preprocess.var["parallel"]=n_concats
                 _rnaseq.preprocess.manager_slurm={"--mem":"20GB", "-t":"1:00:00", "-c":str(n_concats) }
 
-            _rnaseq.preprocess.execute( _rnaseq.download_link.hash )
+            _rnaseq.preprocess.execute( download_jobs )
 
             preprocess_jobs=[ _rnaseq.preprocess.hash ]
         
