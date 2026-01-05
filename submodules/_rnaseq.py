@@ -35,90 +35,51 @@ def load_table(file_path, n):
         df=pd.read_excel(file_path)
     
     elif ext in [".tsv", ".csv"]:
-
         # TSV file (tab-separated)
         print("Reading file as tab separated file")
-
         try:
-            
             df=pd.read_csv( file_path, sep="\\t" )
-
         except:
-            
             raise ValueError(f"Could not read tab separated file")
 
     else:
-        
         raise ValueError(f"Unsupported file type: {ext}")
 
     if len( df.columns.tolist() ) < n :
         raise ValueError(f"Imported table had less than 2 columns.")
 
     if len( df.columns.tolist() ) > n :
-
         cols = list(df.columns)
-
         # special case sra groups
-        if n == 2 :
-            
-            cols_=[ s for s in cols if s == "Experiment" ]+[ s for s in cols if s in ["group", "groups"] ]
-
-            if len(cols_) == n :
-                df=df[cols_]
-
-            exp_idx = cols.index("Experiment")
-
-            # Check that a column exists after Experiment
-            if exp_idx + 1 >= len(cols):
-                raise ValueError("Column 'Experiment' exists but there is no column after it.")
-
-            # Select Experiment and the following column
-            df=df[ cols[exp_idx : exp_idx + 2] ]
-    
-            df.columns=["sample","group"]
-
-        else :
-            df=df[ cols[:n] ]
+        df=df[ cols[:3] ]
 
     return df.to_csv(sep=";", index=False, header=False ).rstrip("\n").replace("\n", r"\n")
 
 
-def process_groups( groups, sra_download ) :
-
-    if sra_download :
-        # sra groups are given in the form
-        # <samples list><groups_list> 
-        n=2
-    else:
-        # own data groups are given in the form
-        # <list of read 1 files><list of read 2 files><groups_list> 
-        n=3
+def process_groups( groups ) :
 
     if os.path.isfile(groups) :
-        groups=load_table(groups, n)
+        groups=load_table(groups )
     
     else:
-
         groups=groups.split("\n")
         groups=[ s.replace(";","_") for s in groups if s ]
+        # own data
+        if ( len(groups) % 2 == 0) :
+            # single reads
+            n=2
         
-        if n != 2:
-            # own data
-            if ( len(groups) % 2 == 0) :
-                # single reads
-                n=2
-            
-            if ( len(groups) % 3 == 0) :
-                # paired reads
-                n=3
+        if ( len(groups) % 3 == 0) :
+            # paired reads
+            n=3
 
         size = len(groups) // n
         groups = [ groups[ i*size : (i+1)*size ] for i in range(n) ]
 
-        if sra_download:
+        if n == 2:
             samples=groups[0]
             groups=groups[-1]
-            groups=[ f"{a};{b}" for a, b in zip(samples, groups) ]
+            groups=[ f"{a};;{b}" for a, b in zip(samples, groups) ]
         else:
             samples=groups[0]
             samples_=groups[0]
