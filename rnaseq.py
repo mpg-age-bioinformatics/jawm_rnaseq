@@ -42,29 +42,16 @@ if __name__ == "__main__":
     # read arguments #
     ##################
 
-    workflows, var, args, unknown_args= jawm.utils.parse_arguments(["main","rnaseq","test", "mastertable"], extra_args={
-        "--acc": "A GEO accession number of the form GSE129642 or an SRA BioProject accession number of the form PRJNA532357.",
-        "--groups" : "A table of the form geo acession number, sample id, group",
-        })
+    workflows, var, args, unknown_args= jawm.utils.parse_arguments( ["main","rnaseq","test", "mastertable"] )
 
-    if args.acc :
-        jawm.Process.update( var={
-            "acc" : args.acc,
-            } )
-        var["acc"]=args.acc
-
-    # all geo/sra analysis must have var["acc"] defined
-    sra_download = bool(var.get("acc"))
-
-    if args.groups or os.path.isfile( var["groups"] ) :
-        if not args.groups :
-            groups=var["groups"]
-        else:
-            groups=args.groups
-
-        groups = _rnaseq.process_groups( groups, sra_download )
+    if var.get("groups", False):
+        groups, bioproject, organism = _rnaseq.process_groups( var["groups"] )
         jawm.Process.update( var={ "groups" : groups } )
         var["groups"]=groups
+    else:
+        bioproject=None
+        organism=None
+
 
     # usage: 
     if workflow( ["main","rnaseq","test", "mastertable" ], workflows ) :
@@ -74,15 +61,13 @@ if __name__ == "__main__":
         #########################
 
         # organism
-        if sra_download and ( "organism" not in var ) :
-            
-            organism=sra.get_unique_sample_organism( var["acc"] )#, email=var.get("email", None), api_key=var.get("api_key", None) )
+        if organism :
             jawm.Process.update( var={ "organism" : organism } )
             var["organism"]=organism
 
         # genome release
         if var.get("release") in (None, "last"):
-            release=genomes.get_latest_ensembl_release()
+            release, available=genomes.get_latest_ensembl_release(var['organism'])
             jawm.Process.update( var={ "release" : release } )
             var["release"]=release
 
@@ -93,12 +78,12 @@ if __name__ == "__main__":
             var["seq_type"]=seq_type
 
         # output folders ie. genomes and rnaseq
-        if not sra_download :
+        if not bioproject :
             chars = string.ascii_letters + string.digits
             chars = ''.join(random.choices(chars, k=7))
             default_location=os.path.join( os.getcwd(), "jawm_rnaseq_"+chars )
         else:
-            default_location=os.path.join( os.getcwd(), "jawm_rnaseq_"+sra.read_acc.var["acc"] )
+            default_location=os.path.join( os.getcwd(), "jawm_rnaseq_"+bioproject )
         
         # output folder
         if "project_folder" not in var :
@@ -122,7 +107,7 @@ if __name__ == "__main__":
             jawm.Process.update( var={ "biotypes_go" : biotypes_go } )
 
         # user's raw data folder
-        if ( not sra_download ) and ( "source_folder" not in var ) :
+        if ( not bioproject ) and ( "source_folder" not in var ) :
             if "download_link" not in var :
                 jawm.Process.update( var={ "mk.source_folder" : "./" } )
             else:
@@ -139,11 +124,50 @@ if __name__ == "__main__":
             "read2_suffix":".read_2.fastq.gz"
         })
 
+        ##################
+        # kallisto index #
+        ##################
+
+        gtf_file=os.path.join( 
+            var["genomes_folder"], 
+            var["organism"], 
+            var["release"], 
+            f'{var["organism"]}.{var["release"]}.no.rRNA.gtf' 
+            )
+
+        kallisto_dic={ 
+            "mk.kallisto_index":os.path.join( var["project_folder"], "kallisto_index" ),
+            "mk.kallisto_output":os.path.join( var["project_folder"], "kallisto_output" ),
+            "gtf_file": gtf_file,
+            "fasta_file":os.path.join( 
+                var["genomes_folder"], 
+                var["organism"], 
+                var["release"], 
+                f'{var["organism"]}.{var["release"]}.{var["seq_type"]}.dna.fa' 
+                )
+        }
+
+        jawm.Process.update( var=kallisto_dic )
+
+        # download references
+        genomes.download_gtf.var["filename"] = genomes.download_gtf.var["organism"] + "." + str(genomes.download_gtf.var["release"]) + ".gtf.gz"
+        genomes.download_gtf.var["mk.output_folder"] = os.path.join( var["project_folder"], var["organism"], var["release"] )
+        genomes.download_gtf.execute()
+
+        genomes.download_dna.var["filename"] = genomes.download_dna.var["organism"] + "." + str(genomes.download_dna.var["release"]) + "." + genomes.download_dna.var["seq_type"] + ".dna.fa.gz"
+        genomes.download_dna.var["mk.output_folder"] = os.path.join( var["project_folder"], var["organism"], var["release"] )
+        genomes.download_dna.execute()
+        
+        # generate indexes
+        kallisto.get_genome.execute( [ genomes.download_gtf.hash, genomes.download_dna.hash ] )
+        kallisto.writecdna.execute( kallisto.get_genome.hash )
+        kallisto.indexer.execute( kallisto.writecdna.hash )
+
         ####################
         # collect raw data #
         ####################
 
-        if not sra_download :
+        if not bioproject :
 
             ##############
             # local data #
@@ -189,14 +213,9 @@ if __name__ == "__main__":
             jawm.Process.wait( sra.read_acc.hash )
 
             # input_xlsx=os.path.join( sra.read_acc.var["raw_data"], f"{sra.read_acc.var['acc']}.samples.xlsx"  )
-            input_tsv=os.path.join( sra.read_acc.var["raw_data"], f"{sra.read_acc.var['acc']}.samples.tsv"  )
-
             sra_ids = []
-
-            with open(input_tsv, newline="") as f:
-                reader = csv.DictReader(f, delimiter="\t")
-                for row in reader:
-                    sra_ids.append(row["Run"])
+            input_tsv=os.path.join( sra.read_acc.var["raw_data"], f"sra.samples.tsv"  )
+            sra_ids = sra.read_samples_file( os.path.join( sra.read_acc.var["raw_data"], "sra.samples.tsv"  ) )
 
             fastq_dump_jobs=[]
             for sraid in sra_ids : 
@@ -217,10 +236,11 @@ if __name__ == "__main__":
 
                 fastq_dump_jobs.append( fastq_dump_.hash )
             
+            jawm.Process.wait( fastq_dump_jobs )
 
             # for some samples there might be more than one SRA per sample
             # which we will concatenate
-            n_concats=sra.get_nconcatenations( input_tsv )
+            n_concats=sra.get_nconcatenations( input_tsv, sra.read_acc.var["raw_data"] )
 
             # define number of parallel concatenations
             if n_concats < 5 :
@@ -239,45 +259,6 @@ if __name__ == "__main__":
             sra.relabel_sra.execute( fastq_dump_jobs )
 
             preprocess_jobs= [ sra.relabel_sra.hash ] 
-
-        ##################
-        # kallisto index #
-        ##################
-
-        gtf_file=os.path.join( 
-            var["genomes_folder"], 
-            var["organism"], 
-            var["release"], 
-            f'{var["organism"]}.{var["release"]}.no.rRNA.gtf' 
-            )
-
-        kallisto_dic={ 
-            "mk.kallisto_index":os.path.join( var["project_folder"], "kallisto_index" ),
-            "mk.kallisto_output":os.path.join( var["project_folder"], "kallisto_output" ),
-            "gtf_file": gtf_file,
-            "fasta_file":os.path.join( 
-                var["genomes_folder"], 
-                var["organism"], 
-                var["release"], 
-                f'{var["organism"]}.{var["release"]}.{var["seq_type"]}.dna.fa' 
-                )
-        }
-
-        jawm.Process.update( var=kallisto_dic )
-
-        # download references
-        genomes.download_gtf.var["filename"] = genomes.download_gtf.var["organism"] + "." + str(genomes.download_gtf.var["release"]) + ".gtf.gz"
-        genomes.download_gtf.var["mk.output_folder"] = os.path.join( var["project_folder"], var["organism"], var["release"] )
-        genomes.download_gtf.execute()
-
-        genomes.download_dna.var["filename"] = genomes.download_dna.var["organism"] + "." + str(genomes.download_dna.var["release"]) + "." + genomes.download_dna.var["seq_type"] + ".dna.fa.gz"
-        genomes.download_dna.var["mk.output_folder"] = os.path.join( var["project_folder"], var["organism"], var["release"] )
-        genomes.download_dna.execute()
-        
-        # generate indexes
-        kallisto.get_genome.execute( [ genomes.download_gtf.hash, genomes.download_dna.hash ] )
-        kallisto.writecdna.execute( kallisto.get_genome.hash )
-        kallisto.indexer.execute( kallisto.writecdna.hash )
 
 
         #################

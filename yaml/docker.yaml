@@ -3,6 +3,7 @@
   environment: "docker"
   parallel: false
   var:
+    organism: "caenorhabditis_elegans"
     # source_folder: "./test/test-input"
     # groups:
     #   daf2_treated.Rep_1.READ_1.fastq.gz;;daf2_treated\n
@@ -17,21 +18,16 @@
     #   N2.Rep_1.READ_1.fastq.gz;;N2_untreated\n
     #   N2.Rep_2.READ_1.fastq.gz;;N2_untreated\n
     #   N2.Rep_3.READ_1.fastq.gz;;N2_untreated
-    acc: PRJNA532357
     groups:
-      SRX5667943;WT-L4\n
-      SRX5667944;WT-L4\n
-      SRX5667945;sftb-1 (cer3/7)\n
-      SRX5667946;sftb-1 (cer3/7)\n
-      SRX5667947;WT-L2\n
-      SRX5667947;WT-L2\[n
-      SRX5667948;WT-L2\n
-      SRX5667948;WT-L2\n
-      SRX5667949;sftb-1 (cer39)\n
-      SRX5667949;sftb-1 (cer39)\n
-      SRX5667950;sftb-1 (cer39)\n
-      SRX5667950;sftb-1 (cer39)\n
-      SRX5667951;sftb-1 (cer6)\n
-      SRX5667951;sftb-1 (cer6)\n
-      SRX5667952;sftb-1 (cer6)\n
-      SRX5667952;sftb-1 (cer6)
+      SRR10544927;N2_OP50\n
+      SRR10544928;rnp6_OP50\n
+      SRR10544929;N2\n
+      SRR10544930;rnp6\n
+      SRR10544931;N2_OP50\n
+      SRR10544932;rnp6_OP50\n
+      SRR10544933;N2\n
+      SRR10544934;rnp6\n
+      SRR10544935;N2_OP50\n
+      SRR10544936;rnp6_OP50\n
+      SRR10544937;N2\n
+      SRR10544938;rnp6

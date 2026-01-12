@@ -6,8 +6,105 @@ import random
 import string
 from io import StringIO
 from pathlib import Path
+import requests
+import xml.etree.ElementTree as ET
+from typing import Optional, Tuple
+
+
+EUTILS = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"
+
 
 AGEPY_IMAGE="mpgagebioinformatics/agepy:9acb5de"
+
+def _first_text(root: ET.Element, xpath: str) -> Optional[str]:
+    el = root.find(xpath)
+    if el is not None and el.text:
+        t = el.text.strip()
+        return t if t else None
+    return None
+
+
+def srr_to_bioproject_and_organism_eutils(
+    srr: str,
+    *,
+    email: str = "your_email@example.org",
+    tool: str = "srr-metadata-script",
+    timeout: int = 30,
+) -> Tuple[Optional[str], Optional[str]]:
+    """
+    Given an SRA Run accession (SRR...), return (bioproject_id, organism)
+    by querying NCBI SRA via E-utilities.
+    """
+
+    # 1) esearch: SRR -> internal SRA UID
+    r = requests.get(
+        f"{EUTILS}/esearch.fcgi",
+        params={
+            "db": "sra",
+            "term": srr,
+            "retmode": "xml",
+            "tool": tool,
+            "email": email,
+        },
+        timeout=timeout,
+    )
+    r.raise_for_status()
+    esearch_root = ET.fromstring(r.text)
+    uid = _first_text(esearch_root, ".//IdList/Id")
+    if not uid:
+        raise ValueError(f"No SRA record found for run {srr}")
+
+    # 2) efetch docsum: UID -> metadata XML
+    r = requests.get(
+        f"{EUTILS}/efetch.fcgi",
+        params={
+            "db": "sra",
+            "id": uid,
+            "rettype": "docsum",
+            "retmode": "xml",
+            "tool": tool,
+            "email": email,
+        },
+        timeout=timeout,
+    )
+    r.raise_for_status()
+    root = ET.fromstring(r.text)
+
+    # Common direct fields (these names can differ by record)
+    bioproject = None
+    for name in ("Bioproject", "BioProject", "bioproject"):
+        el = root.find(f".//Item[@Name='{name}']")
+        if el is not None and el.text and el.text.strip():
+            bioproject = el.text.strip()
+            break
+
+    organism = None
+    for name in ("Organism", "ScientificName"):
+        el = root.find(f".//Item[@Name='{name}']")
+        if el is not None and el.text and el.text.strip():
+            organism = el.text.strip()
+            break
+
+    # Fallback: parse ExpXml / Runs XML blob if needed
+    if not bioproject or not organism:
+        expxml_el = root.find(".//Item[@Name='ExpXml']")
+        if expxml_el is not None and expxml_el.text:
+            blob = expxml_el.text
+
+            if not bioproject:
+                # Look for PRJNA/PRJEB/PRJDB patterns
+                m = re.search(r"\bPRJ(?:NA|EB|DB)\d+\b", blob)
+                if m:
+                    bioproject = m.group(0)
+
+            if not organism:
+                # Often present like: <Organism ScientificName="Homo sapiens" .../>
+                m = re.search(r'ScientificName="([^"]+)"', blob)
+                if m:
+                    organism = m.group(1)
+
+    return bioproject, organism.lower().replace(" ", "_")
+
 
 def ccg_samples( groups, source_folder ):
     """
@@ -26,7 +123,7 @@ def ccg_samples( groups, source_folder ):
     df["read1"]=df["read1"].apply(lambda x: ",".join( [ s for s in read_1 if f"_{x}_" in s ]    ))
     return df.to_csv(sep=";", index=False, header=False).rstrip("\n")
     
-def load_table(file_path, n):
+def load_table(file_path):
     _, ext = os.path.splitext(file_path)
     ext = ext.lower()
 
@@ -45,15 +142,12 @@ def load_table(file_path, n):
     else:
         raise ValueError(f"Unsupported file type: {ext}")
 
-    if len( df.columns.tolist() ) < n :
+    if len( df.columns.tolist() ) < 2 :
         raise ValueError(f"Imported table had less than 2 columns.")
 
-    if len( df.columns.tolist() ) > n :
-        cols = list(df.columns)
-        # special case sra groups
-        df=df[ cols[:3] ]
-
-    return df.to_csv(sep=";", index=False, header=False ).rstrip("\n").replace("\n", r"\n")
+    return df
+    
+    #.to_csv(sep=";", index=False, header=False ).rstrip("\n").replace("\n", r"\n")
 
 
 def process_groups( groups ) :
@@ -62,33 +156,20 @@ def process_groups( groups ) :
         groups=load_table(groups )
     
     else:
-        groups=groups.split("\n")
-        groups=[ s.replace(";","_") for s in groups if s ]
-        # own data
-        if ( len(groups) % 2 == 0) :
-            # single reads
-            n=2
-        
-        if ( len(groups) % 3 == 0) :
-            # paired reads
-            n=3
+        groups = groups.replace("\\n", "\n")
+        groups = "\n".join(line.strip() for line in groups.split("\n"))
+        groups=[ s.split(";") for s in groups.split("\n") ]
+        groups=pd.DataFrame(groups)
 
-        size = len(groups) // n
-        groups = [ groups[ i*size : (i+1)*size ] for i in range(n) ]
+    value=groups.iloc[0, 0]
 
-        if n == 2:
-            samples=groups[0]
-            groups=groups[-1]
-            groups=[ f"{a};;{b}" for a, b in zip(samples, groups) ]
-        else:
-            samples=groups[0]
-            samples_=groups[0]
-            groups=groups[-1]
-            groups=[ f"{a};{b};{c}" for a, b, c in zip( samples, samples_, groups ) ]
+    groups=groups.to_csv(sep=";", index=False, header=False ).rstrip("\n").replace("\n", r"\n")
 
-        groups=r"\n".join(groups)
-
-    return groups
+    if value.startswith("SRR") and not value.endswith((".fastq", ".fq", ".fastq.gz")):
+        bioproject, organism = srr_to_bioproject_and_organism_eutils( value.split(",")[0] )
+        return groups, bioproject, organism
+    else:
+        return groups, None, None
 
 download_link=jawm.Process( 
     name="download_link",
