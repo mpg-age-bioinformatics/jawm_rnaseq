@@ -12,10 +12,10 @@
       daf2.Rep_3.READ_1.fastq.gz;;daf2_untreated\n
       N2_treated.Rep_1.READ_1.fastq.gz;;N2_treated\n
       N2_treated.Rep_2.READ_1.fastq.gz;;N2_treated\n
-      N2_treated.Rep_3.READ_1.READ_1.fastq.gz;;N2_treated\n
+      N2_treated.Rep_3.READ_1.fastq.gz;;N2_treated\n
       daf2_treated.Rep_1.READ_1.fastq.gz;;daf2_treated\n
       daf2_treated.Rep_2.READ_1.fastq.gz;;daf2_treated\n
-      daf2_treated.Rep_3.READ_1.READ_1.fastq.gz;;daf2_treated
+      daf2_treated.Rep_3.READ_1.fastq.gz;;daf2_treated
  
 - scope: hash
   include: ./test/test-output/rnaseq.txt
