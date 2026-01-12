@@ -156,7 +156,10 @@ def process_groups( groups ) :
         groups=load_table(groups )
     
     else:
+        groups = groups.rstrip(';')
         groups = groups.replace("\\n", "\n")
+        if groups.endswith("\n"):
+            groups = groups[:-1]
         groups = "\n".join(line.strip() for line in groups.split("\n"))
         groups=[ s.split(";") for s in groups.split("\n") ]
         groups=pd.DataFrame(groups)

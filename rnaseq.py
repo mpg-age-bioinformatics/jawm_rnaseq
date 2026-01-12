@@ -52,7 +52,6 @@ if __name__ == "__main__":
         bioproject=None
         organism=None
 
-
     # usage: 
     if workflow( ["main","rnaseq","test", "mastertable" ], workflows ) :
 
