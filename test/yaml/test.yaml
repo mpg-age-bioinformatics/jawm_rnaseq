@@ -1,7 +1,7 @@
 - scope: global
   environment: "docker"
   var:
-    source_folder: "./test/test-input"
+    map.source_folder: "./test/test-input"
     organism: "caenorhabditis_elegans"
     groups:
       N2.Rep_1.READ_1.fastq.gz;;N2_untreated\n
@@ -17,6 +17,6 @@
       daf2_treated.Rep_2.READ_1.fastq.gz;;daf2_treated\n
       daf2_treated.Rep_3.READ_1.READ_1.fastq.gz;;daf2_treated
  
-# - scope: hash
-#   include: ./test/test-output/rnaseq.txt
-#   overwrite: true # overwrite any existing hash already present on the logs folder
+- scope: hash
+  include: ./test/test-output/rnaseq.txt
+  overwrite: true # overwrite any existing hash already present on the logs folder

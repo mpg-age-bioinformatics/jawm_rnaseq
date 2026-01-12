@@ -23,7 +23,7 @@
     #   SRR10544937;N2\n
     #   SRR10544938;rnp6
 
-    source_folder: "./test/test-input"
+    map.source_folder: "./test/test-input"
     organism: "caenorhabditis_elegans"
     groups:
       N2.Rep_1.READ_1.fastq.gz;;N2_untreated\n
