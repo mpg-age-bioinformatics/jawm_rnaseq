@@ -22,7 +22,7 @@
     #   SRR10544936;rnp6_OP50\n
     #   SRR10544937;N2\n
     #   SRR10544938;rnp6
-
+    
     map.source_folder: "./test/test-input"
     organism: "caenorhabditis_elegans"
     groups:
@@ -34,10 +34,10 @@
       daf2.Rep_3.READ_1.fastq.gz;;daf2_untreated\n
       N2_treated.Rep_1.READ_1.fastq.gz;;N2_treated\n
       N2_treated.Rep_2.READ_1.fastq.gz;;N2_treated\n
-      N2_treated.Rep_3.READ_1.READ_1.fastq.gz;;N2_treated\n
+      N2_treated.Rep_3.READ_1.fastq.gz;;N2_treated\n
       daf2_treated.Rep_1.READ_1.fastq.gz;;daf2_treated\n
       daf2_treated.Rep_2.READ_1.fastq.gz;;daf2_treated\n
-      daf2_treated.Rep_3.READ_1.READ_1.fastq.gz;;daf2_treated
+      daf2_treated.Rep_3.READ_1.fastq.gz;;daf2_treated
 
 - scope: process
   name: 
