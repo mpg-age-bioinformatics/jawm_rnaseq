@@ -127,35 +127,32 @@ if __name__ == "__main__":
         # kallisto index #
         ##################
 
+
+        # download references
+        genomes.download_gtf.var["filename"] = genomes.download_gtf.var["organism"] + "." + str( genomes.download_gtf.var["release"] ) + ".gtf.gz"
+        genomes.download_gtf.var["mk.output_folder"] = os.path.join( var["genomes_folder"], var["organism"], var["release"] )
+        genomes.download_gtf.execute()
+
+        genomes.download_dna.var["filename"] = genomes.download_dna.var["organism"] + "." + str(genomes.download_dna.var["release"]) + "." + genomes.download_dna.var["seq_type"] + ".dna.fa.gz"
+        genomes.download_dna.var["mk.output_folder"] = os.path.join( var["genomes_folder"], var["organism"], var["release"] )
+        genomes.download_dna.execute()
+
         gtf_file=os.path.join( 
-            var["genomes_folder"], 
-            var["organism"], 
-            var["release"], 
+            genomes.download_gtf.var["mk.output_folder"],
             f'{var["organism"]}.{var["release"]}.no.rRNA.gtf' 
             )
 
         kallisto_dic={ 
-            "mk.kallisto_index":os.path.join( var["project_folder"], "kallisto_index" ),
-            "mk.kallisto_output":os.path.join( var["project_folder"], "kallisto_output" ),
+            "mk.kallisto_index":os.path.join( genomes.download_gtf.var["mk.output_folder"], "kallisto_index" ),
+            "mk.kallisto_output":os.path.join( genomes.download_gtf.var["mk.project_folder"], "kallisto_output" ),
             "gtf_file": gtf_file,
             "fasta_file":os.path.join( 
-                var["genomes_folder"], 
-                var["organism"], 
-                var["release"], 
+                genomes.download_gtf.var["mk.output_folder"], 
                 f'{var["organism"]}.{var["release"]}.{var["seq_type"]}.dna.fa' 
                 )
         }
 
         jawm.Process.update( var=kallisto_dic )
-
-        # download references
-        genomes.download_gtf.var["filename"] = genomes.download_gtf.var["organism"] + "." + str(genomes.download_gtf.var["release"]) + ".gtf.gz"
-        genomes.download_gtf.var["mk.output_folder"] = os.path.join( var["project_folder"], var["organism"], var["release"] )
-        genomes.download_gtf.execute()
-
-        genomes.download_dna.var["filename"] = genomes.download_dna.var["organism"] + "." + str(genomes.download_dna.var["release"]) + "." + genomes.download_dna.var["seq_type"] + ".dna.fa.gz"
-        genomes.download_dna.var["mk.output_folder"] = os.path.join( var["project_folder"], var["organism"], var["release"] )
-        genomes.download_dna.execute()
         
         # generate indexes
         kallisto.get_genome.execute( [ genomes.download_gtf.hash, genomes.download_dna.hash ] )
