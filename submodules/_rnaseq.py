@@ -146,8 +146,6 @@ def load_table(file_path):
         raise ValueError(f"Imported table had less than 2 columns.")
 
     return df
-    
-    #.to_csv(sep=";", index=False, header=False ).rstrip("\n").replace("\n", r"\n")
 
 
 def process_groups( groups ) :
@@ -173,6 +171,7 @@ def process_groups( groups ) :
         return groups, bioproject, organism
     else:
         return groups, None, None
+
 
 download_link=jawm.Process( 
     name="download_link",

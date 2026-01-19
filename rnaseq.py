@@ -478,20 +478,19 @@ if __name__ == "__main__":
     jawm.Process.wait( )
 
     # list most relevant files
-    report_file=os.path.join( var["project_folder"], "report_file.txt" )
-    if not os.path.isfile(report_file):
+    if var.get("report_file",False) :
+        
         report={}
         report.update( fastqc.report_files( fastqc.fastqc.var["fastqc_output"] ) )
         report.update( multiqc.report_files( multiqc.multiqc.var["multiqc_output"] ) )    
         report.update( deseq2.report_files( deseq2.deseq2.var["deseq2_output"] ) )
 
-        with open(report_file, "w") as f :
+        with open( f"{var["report_file"]}_", "w") as f :
             for folder, file_list in report.items() :
                 for file in file_list :
                     f.write(f"{folder} {file}\n")
-    else:
-        logger.warning(
-            f"Skipping report file as it already exists: {report_file}")
+        
+        os.rename(f"{var["report_file"]}_", f"{var["report_file"]}")
 
     if workflow( "test", workflows ) :
         # for the test workflow we also do something more (just for rnaseq)
