@@ -478,8 +478,8 @@ if __name__ == "__main__":
     jawm.Process.wait( )
 
     # list most relevant files
-    if var.get("report_file",False) :
-        
+    if var.get("report_file", False) :
+
         report={}
         report.update( fastqc.report_files( fastqc.fastqc.var["fastqc_output"] ) )
         report.update( multiqc.report_files( multiqc.multiqc.var["multiqc_output"] ) )    
