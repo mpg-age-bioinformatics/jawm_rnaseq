@@ -485,12 +485,12 @@ if __name__ == "__main__":
         report.update( multiqc.report_files( multiqc.multiqc.var["multiqc_output"] ) )    
         report.update( deseq2.report_files( deseq2.deseq2.var["deseq2_output"] ) )
 
-        with open( f"{var["report_file"]}_", "w") as f :
+        with open( f'{var["report_file"]}_', "w") as f :
             for folder, file_list in report.items() :
                 for file in file_list :
                     f.write(f"{folder} {file}\n")
         
-        os.rename(f"{var["report_file"]}_", f"{var["report_file"]}")
+        os.rename(f'{var["report_file"]}_', f'{var["report_file"]}')
 
     if workflow( "test", workflows ) :
         # for the test workflow we also do something more (just for rnaseq)
