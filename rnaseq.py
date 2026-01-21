@@ -32,17 +32,23 @@ if __name__ == "__main__":
         "jawm_deseq2",
         ])
 
-    ############################
-    # download required images #
-    ############################
-
-    images=get_image( )
-
     ##################
     # read arguments #
     ##################
 
     workflows, var, args, unknown_args= jawm.utils.parse_arguments( ["main","rnaseq","test", "mastertable"] )
+
+    ############################
+    # download required images #
+    ############################
+
+    if str(var.get("skip_prepull", False)).lower() != "true" :
+    
+        images=get_image( ) 
+
+    ##################
+    # process groups #
+    ##################
 
     if var.get("groups", False):
         groups, bioproject, organism = _rnaseq.process_groups( var["groups"] )
@@ -144,7 +150,7 @@ if __name__ == "__main__":
 
         kallisto_dic={ 
             "mk.kallisto_index":os.path.join( genomes.download_gtf.var["mk.output_folder"], "kallisto_index" ),
-            "mk.kallisto_output":os.path.join( genomes.download_gtf.var["mk.project_folder"], "kallisto_output" ),
+            "mk.kallisto_output":os.path.join( var["project_folder"], "kallisto_output" ),
             "gtf_file": gtf_file,
             "fasta_file":os.path.join( 
                 genomes.download_gtf.var["mk.output_folder"], 
