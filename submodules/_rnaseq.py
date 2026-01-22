@@ -8,15 +8,15 @@ from io import StringIO
 from pathlib import Path
 import requests
 import xml.etree.ElementTree as ET
-from typing import Optional, Tuple, List, Tuple, Dict
+from typing import Optional, Tuple, List, Tuple, Dict, Union, Any
 import gzip
 import io
+import csv
 
 EUTILS = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"
 
 AGEPY_IMAGE="mpgagebioinformatics/agepy:9acb5de"
 
-_PRJ_RE = re.compile(r"\b(PRJ[A-Z]{2}\d+)\b")  # PRJNA..., PRJEB..., PRJDB...
 
 
 def _bucket_dir_for_gse(gse: str) -> str:
@@ -48,6 +48,9 @@ def _download_family_soft_text(
     with gzip.GzipFile(fileobj=io.BytesIO(r.content)) as gz:
         return gz.read().decode("utf-8", errors="replace")
 
+# _PRJ_RE = re.compile(r"\b(PRJ[A-Z]{2}\d+)\b")  # PRJNA..., PRJEB..., PRJDB...
+
+# _PRJ_RE = re.compile(r"(PRJ[A-Z]{2}\d+)")
 
 def parse_bioproject_and_gsms_from_family_soft(soft_text: str) -> Tuple[Optional[str], List[Tuple[str, str]]]:
     """
@@ -64,9 +67,10 @@ def parse_bioproject_and_gsms_from_family_soft(soft_text: str) -> Tuple[Optional
         # Series-level relation lines are where BioProject often appears
         if line.startswith("!Series_relation"):
             if bioproject is None:
-                m = _PRJ_RE.search(line)
-                if m:
-                    bioproject = m.group(1)
+                if "bioproject/" in line:
+                    m = line.split("bioproject/")[-1]
+                    if m:
+                        bioproject = m.strip()
 
         # Start of a sample block
         if line.startswith("^SAMPLE"):
@@ -102,7 +106,8 @@ def geo_gse_to_bioproject_and_samples(
     Convenience wrapper: downloads + parses.
     """
     soft_text = _download_family_soft_text(gse, timeout=timeout, user_agent=user_agent)
-    return parse_bioproject_and_gsms_from_family_soft(soft_text)
+    parsed=parse_bioproject_and_gsms_from_family_soft(soft_text)
+    return parsed
 
 _GSM_RE = re.compile(r"\bGSM\d+\b")
 _PRJ_RE = re.compile(r"^PRJ[A-Z]{2}\d+$", re.IGNORECASE)

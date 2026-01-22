@@ -8,7 +8,8 @@
   # before_script: "module load apptainer"
   # manager_slurm: {"--ntasks-per-core":"2", "-p":"general,small" }
   parallel: True
-  var:
+  # var:
+  #   geo: GSE141097 
     # groups:
     #   SRR10544927;N2_OP50\n
     #   SRR10544928;rnp6_OP50\n
@@ -24,20 +25,20 @@
     #   SRR10544938;rnp6
     
     # map.source_folder: "./test/test-input"
-    organism: "caenorhabditis_elegans"
-    groups: |
-      N2.Rep_1.READ_1.fastq.gz;;N2_untreated
-      N2.Rep_2.READ_1.fastq.gz;;N2_untreated
-      N2.Rep_3.READ_1.fastq.gz;;N2_untreated
-      daf2.Rep_1.READ_1.fastq.gz;;daf2_untreated
-      daf2.Rep_2.READ_1.fastq.gz;;daf2_untreated
-      daf2.Rep_3.READ_1.fastq.gz;;daf2_untreated
-      N2_treated.Rep_1.READ_1.fastq.gz;;N2_treated
-      N2_treated.Rep_2.READ_1.fastq.gz;;N2_treated
-      N2_treated.Rep_3.READ_1.fastq.gz;;N2_treated
-      daf2_treated.Rep_1.READ_1.fastq.gz;;daf2_treated
-      daf2_treated.Rep_2.READ_1.fastq.gz;;daf2_treated
-      daf2_treated.Rep_3.READ_1.fastq.gz;;daf2_treated
+    # organism: "caenorhabditis_elegans"
+    # groups: |
+    #   N2.Rep_1.READ_1.fastq.gz;;N2_untreated
+    #   N2.Rep_2.READ_1.fastq.gz;;N2_untreated
+    #   N2.Rep_3.READ_1.fastq.gz;;N2_untreated
+    #   daf2.Rep_1.READ_1.fastq.gz;;daf2_untreated
+    #   daf2.Rep_2.READ_1.fastq.gz;;daf2_untreated
+    #   daf2.Rep_3.READ_1.fastq.gz;;daf2_untreated
+    #   N2_treated.Rep_1.READ_1.fastq.gz;;N2_treated
+    #   N2_treated.Rep_2.READ_1.fastq.gz;;N2_treated
+    #   N2_treated.Rep_3.READ_1.fastq.gz;;N2_treated
+    #   daf2_treated.Rep_1.READ_1.fastq.gz;;daf2_treated
+    #   daf2_treated.Rep_2.READ_1.fastq.gz;;daf2_treated
+    #   daf2_treated.Rep_3.READ_1.fastq.gz;;daf2_treated
 
 - scope: process
   name: 

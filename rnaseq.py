@@ -37,14 +37,14 @@ if __name__ == "__main__":
     ##################
 
     workflows, var, args, unknown_args= jawm.utils.parse_arguments( ["main","rnaseq","test", "mastertable"] )
-
+    
     ############################
     # download required images #
     ############################
 
-    if str(var.get("skip_prepull", False)).lower() == "false" :
+    # if str(var.get("skip_prepull", False)).lower() == "false" :
     
-        images=get_image( ) 
+    #     images=get_image( ) 
 
     ##################
     # process groups #
@@ -58,6 +58,7 @@ if __name__ == "__main__":
         groups, bioproject, organism = _rnaseq.process_groups( var["groups"] )
         jawm.Process.update( var={ "groups" : groups } )
         var["groups"]=groups
+
     else:
         bioproject=None
         organism=None
