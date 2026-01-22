@@ -50,6 +50,10 @@ if __name__ == "__main__":
     # process groups #
     ##################
 
+    if var.get("geo", False) :
+        groups=_rnaseq.get_gse_groups( var["geo"])
+        var["groups"]=groups
+
     if var.get("groups", False):
         groups, bioproject, organism = _rnaseq.process_groups( var["groups"] )
         jawm.Process.update( var={ "groups" : groups } )

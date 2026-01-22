@@ -8,13 +8,248 @@ from io import StringIO
 from pathlib import Path
 import requests
 import xml.etree.ElementTree as ET
-from typing import Optional, Tuple
-
+from typing import Optional, Tuple, List, Tuple, Dict
+import gzip
+import io
 
 EUTILS = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"
 
-
 AGEPY_IMAGE="mpgagebioinformatics/agepy:9acb5de"
+
+_PRJ_RE = re.compile(r"\b(PRJ[A-Z]{2}\d+)\b")  # PRJNA..., PRJEB..., PRJDB...
+
+
+def _bucket_dir_for_gse(gse: str) -> str:
+    """
+    GEO series directory bucketing:
+      GSE127917 -> GSE127nnn
+      GSE999    -> GSEnnn
+    """
+    n = int(gse[3:])
+    prefix = str(n)[:-3]  # drop last 3 digits
+    return f"GSE{prefix}nnn" if prefix else "GSEnnn"
+
+
+def _download_family_soft_text(
+    gse: str,
+    *,
+    timeout: int = 60,
+    user_agent: str = "geo-soft-parser/1.0 (contact: you@example.com)",
+) -> str:
+    gse = gse.strip().upper()
+    bucket = _bucket_dir_for_gse(gse)
+    url = f"https://ftp.ncbi.nlm.nih.gov/geo/series/{bucket}/{gse}/soft/{gse}_family.soft.gz"
+
+    sess = requests.Session()
+    sess.headers.update({"User-Agent": user_agent})
+    r = sess.get(url, timeout=timeout)
+    r.raise_for_status()
+
+    with gzip.GzipFile(fileobj=io.BytesIO(r.content)) as gz:
+        return gz.read().decode("utf-8", errors="replace")
+
+
+def parse_bioproject_and_gsms_from_family_soft(soft_text: str) -> Tuple[Optional[str], List[Tuple[str, str]]]:
+    """
+    Returns:
+      (bioproject_or_None, [(GSM, Sample_title), ...])
+    """
+    bioproject: Optional[str] = None
+    samples: List[Tuple[str, str]] = []
+
+    current_gsm: Optional[str] = None
+    current_title: str = ""
+
+    for line in soft_text.splitlines():
+        # Series-level relation lines are where BioProject often appears
+        if line.startswith("!Series_relation"):
+            if bioproject is None:
+                m = _PRJ_RE.search(line)
+                if m:
+                    bioproject = m.group(1)
+
+        # Start of a sample block
+        if line.startswith("^SAMPLE"):
+            # flush previous GSM if any
+            if current_gsm is not None:
+                samples.append((current_gsm, current_title))
+
+            m = re.search(r"\b(GSM\d+)\b", line)
+            current_gsm = m.group(1) if m else None
+            current_title = ""
+            continue
+
+        # Within a sample block, grab Sample_title (your "N2_1", etc.)
+        if current_gsm is not None and line.startswith("!Sample_title"):
+            # Format: !Sample_title = N2_1
+            parts = line.split("=", 1)
+            current_title = parts[1].strip() if len(parts) == 2 else ""
+
+    # flush last sample
+    if current_gsm is not None:
+        samples.append((current_gsm, current_title))
+
+    return bioproject, samples
+
+
+def geo_gse_to_bioproject_and_samples(
+    gse: str,
+    *,
+    timeout: int = 60,
+    user_agent: str = "geo-soft-parser/1.0 (contact: you@example.com)",
+) -> Tuple[Optional[str], List[Tuple[str, str]]]:
+    """
+    Convenience wrapper: downloads + parses.
+    """
+    soft_text = _download_family_soft_text(gse, timeout=timeout, user_agent=user_agent)
+    return parse_bioproject_and_gsms_from_family_soft(soft_text)
+
+_GSM_RE = re.compile(r"\bGSM\d+\b")
+_PRJ_RE = re.compile(r"^PRJ[A-Z]{2}\d+$", re.IGNORECASE)
+
+
+def sra_runinfo_for_bioproject_find_gsm_columns(
+    bioproject: str,
+    *,
+    timeout: int = 60,
+    user_agent: str = "sra-runinfo-fetch/1.0 (contact: you@example.com)",
+    retmax: int = 200000,
+) -> Tuple[Any, str, List[str]]:
+    """
+    Fetch SRA RunInfo metadata for a BioProject and identify columns containing GSM accessions.
+
+    Returns:
+      (table, run_column_name, gsm_columns)
+
+    - table:
+        If pandas is available -> pandas.DataFrame
+        Else -> List[Dict[str, str]] rows
+    - run_column_name:
+        Usually 'Run' in RunInfo CSV
+    - gsm_columns:
+        Column names where at least one value matches /GSM\\d+/
+
+    Notes:
+    - Uses NCBI E-utilities: esearch (db=sra, term=<bioproject>, usehistory=y) -> efetch (rettype=runinfo).
+    - RunInfo schema varies by experiment; GSM may appear in columns like 'GEO_Accession', etc.
+    """
+    bioproject = bioproject.strip()
+    if not _PRJ_RE.match(bioproject):
+        raise ValueError(f"Expected a BioProject accession like PRJNA592073, got: {bioproject!r}")
+
+    sess = requests.Session()
+    sess.headers.update({"User-Agent": user_agent})
+
+    # 1) ESearch SRA with history
+    esearch_url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi"
+    esearch_params = {
+        "db": "sra",
+        "term": bioproject,
+        "usehistory": "y",
+        "retmode": "json",
+        "retmax": str(retmax),
+    }
+    r = sess.get(esearch_url, params=esearch_params, timeout=timeout)
+    r.raise_for_status()
+    j = r.json()
+
+    esr = j.get("esearchresult", {})
+    count = int(esr.get("count", "0") or 0)
+    webenv = esr.get("webenv")
+    query_key = esr.get("querykey")
+
+    if not count or not webenv or not query_key:
+        # Could be private/removed, typo, or no SRA runs indexed for that BioProject
+        raise RuntimeError(
+            f"No SRA records found for {bioproject} (count={count}). "
+            "If this is a GEO-only project or private, RunInfo may not be available."
+        )
+
+    # 2) EFetch RunInfo CSV using the search history
+    efetch_url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi"
+    efetch_params = {
+        "db": "sra",
+        "query_key": query_key,
+        "WebEnv": webenv,
+        "rettype": "runinfo",
+        "retmode": "text",
+    }
+    r2 = sess.get(efetch_url, params=efetch_params, timeout=timeout)
+    r2.raise_for_status()
+    text = r2.text
+
+    # RunInfo sometimes returns an error page or empty content; guard lightly
+    if "Error:" in text[:200] or len(text.strip()) == 0:
+        raise RuntimeError("EFetch did not return a valid RunInfo CSV payload.")
+
+    # Parse CSV
+    reader = csv.DictReader(io.StringIO(text))
+    rows: List[Dict[str, str]] = []
+    for row in reader:
+        # normalize None -> ""
+        rows.append({k: (v if v is not None else "") for k, v in row.items()})
+
+    if not rows:
+        raise RuntimeError("RunInfo CSV parsed but contained no rows.")
+
+    # Identify RUN column (most commonly 'Run', sometimes 'RUN' though rare)
+    fieldnames = list(rows[0].keys())
+    run_col = None
+    for cand in ("Run", "RUN", "run"):
+        if cand in fieldnames:
+            run_col = cand
+            break
+    if run_col is None:
+        # fallback: any column name containing 'run' exactly once
+        for f in fieldnames:
+            if f.lower() == "run":
+                run_col = f
+                break
+    if run_col is None:
+        raise RuntimeError(f"Could not find a RUN column in RunInfo fields: {fieldnames[:30]} ...")
+
+    # Find columns containing GSM accessions
+    gsm_cols: List[str] = []
+    for col in fieldnames:
+        # scan until first match for speed
+        for row in rows:
+            val = row.get(col, "") or ""
+            if _GSM_RE.search(val):
+                gsm_cols.append(col)
+                break
+
+    # Return as pandas DataFrame if available (nice for downstream work)
+    try:
+        import pandas as pd  # type: ignore
+        df = pd.DataFrame(rows)
+        return df, run_col, gsm_cols
+    except Exception:
+        return rows, run_col, gsm_cols
+
+
+def clean_group(x):
+    x_=x[:-1]
+    x_=x_.replace("-","_").replace("rep","").replace("Rep","").replace("REP","").strip("_ ").replace(" ","_")
+    return x_
+
+
+def get_gse_groups(gse):
+    bioproject, samples = geo_gse_to_bioproject_and_samples(gse)
+    table, run_col, gsm_cols = sra_runinfo_for_bioproject_find_gsm_columns(bioproject)
+    samples=pd.DataFrame(samples, columns=["GSM","Sample_Name"])
+    df=table[[run_col,gsm_cols[0] ]]
+    df.columns=["SRR","GSM"]
+    df=pd.merge(df,samples,on=["GSM"],how="left")
+    df = (
+        df
+        .groupby("Sample_Name", as_index=False)
+        .agg(lambda x: ",".join(x.astype(str)))
+    )
+    df["group"]=df["Sample_Name"].apply( lambda x: clean_group(x) )
+    df=df[["SRR","group"]]
+    groups=df.to_csv(sep=";", index=False, header=False ).rstrip("\n").replace("\n", r"\n")
+    return groups
+
 
 def _first_text(root: ET.Element, xpath: str) -> Optional[str]:
     el = root.find(xpath)
