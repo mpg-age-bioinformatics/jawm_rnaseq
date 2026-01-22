@@ -42,7 +42,7 @@ if __name__ == "__main__":
     # download required images #
     ############################
 
-    if str(var.get("skip_prepull", False)).lower() != "true" :
+    if str(var.get("skip_prepull", False)).lower() == "false" :
     
         images=get_image( ) 
 
