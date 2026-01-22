@@ -1,7 +1,7 @@
 import jawm
 import logging
 
-logger = logging.getLogger("jawm")
+logger = logging.getLogger("jawm_rnaseq")
 
 if __name__ == "__main__":
     import sys
@@ -42,15 +42,18 @@ if __name__ == "__main__":
     # download required images #
     ############################
 
-    # if str(var.get("skip_prepull", False)).lower() == "false" :
+    if str(var.get("skip_prepull", False)).lower() == "false" :
     
-    #     images=get_image( ) 
+        images=get_image( ) 
 
     ##################
     # process groups #
     ##################
 
     if var.get("geo", False) :
+        logger.warning("""\
+Parsing groups out of a GEO accession only works if the sample names finish with replicate infornation. Eg. wt 1, wt rep_1, wt sample 1, wt A, ..\
+""")
         groups=_rnaseq.get_gse_groups( var["geo"])
         var["groups"]=groups
 
@@ -488,27 +491,37 @@ if __name__ == "__main__":
     # wait for all jobs to finish
     jawm.Process.wait( )
 
-    # list most relevant files
-    if var.get("report_file", False) :
+    # write Readme and list most relevant files
+    if not var.get("report_file", False) :
+        var["report_file"]=os.path.join(var["project_folder"], "report_file.txt")
+    if not var.get("readme_file", False) :
+        var["readme_file"]=os.path.join(var["project_folder"], "README.md")
+    
+    readme=_rnaseq.make_readme(var, var["readme_file"] )
 
-        sample_mapping=os.path.join( kallisto.unstranded_mapping.var["raw_data"], "samples.mapping.xlsx" )
+    def add_files(report={}, add={} ):
+        for k in add :
+            report[k]=report.get(k, []) + add[k]
+        return report
+    
+    report={
+        "main" : [ os.path.join( kallisto.unstranded_mapping.var["raw_data"], "samples.mapping.xlsx" ) ,
+            var["readme_file"],
+            var["report_file"]
+            ]
+    }
 
-        def add_files(report={}, add={} ):
-            for k in add :
-                report[k]=report.get(k, []) + add[k]
-            return report
-        
-        report=add_files(report={}, add=fastqc.report_files( fastqc.fastqc.var["fastqc_output"] ) )
-        report=add_files(report=report, add=multiqc.report_files( multiqc.multiqc.var["multiqc_output"] ) )
-        report=add_files(report=report, add=deseq2.report_files( deseq2.deseq2.var["deseq2_output"] ) )
-        report=add_files(report=report, add={"main" : [sample_mapping]} )
+    report=add_files(report=report, add=fastqc.report_files( fastqc.fastqc.var["fastqc_output"] ) )
+    report=add_files(report=report, add=multiqc.report_files( multiqc.multiqc.var["multiqc_output"] ) )
+    report=add_files(report=report, add=deseq2.report_files( deseq2.deseq2.var["deseq2_output"] ) )
 
-        with open( f'{var["report_file"]}_', "w") as f :
-            for folder, file_list in report.items() :
-                for file in file_list :
-                    f.write(f"{folder} {file}\n")
-        
-        os.rename(f'{var["report_file"]}_', f'{var["report_file"]}')
+
+    with open( f'{var["report_file"]}_', "w") as f :
+        for folder, file_list in report.items() :
+            for file in file_list :
+                f.write(f"{folder} {file}\n")
+    
+    os.rename(f'{var["report_file"]}_', f'{var["report_file"]}')
 
     if workflow( "test", workflows ) :
         # for the test workflow we also do something more (just for rnaseq)

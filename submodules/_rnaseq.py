@@ -12,6 +12,8 @@ from typing import Optional, Tuple, List, Tuple, Dict, Union, Any
 import gzip
 import io
 import csv
+import warnings
+
 
 EUTILS = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"
 
@@ -239,6 +241,7 @@ def clean_group(x):
 
 
 def get_gse_groups(gse):
+
     bioproject, samples = geo_gse_to_bioproject_and_samples(gse)
     table, run_col, gsm_cols = sra_runinfo_for_bioproject_find_gsm_columns(bioproject)
     samples=pd.DataFrame(samples, columns=["GSM","Sample_Name"])
@@ -411,6 +414,55 @@ def process_groups( groups ) :
         return groups, bioproject, organism
     else:
         return groups, None, None
+
+def get_commit():
+    if os.path.isfile(".commit") :
+        with open(".commit", "r") as f:
+            ver=f.readlines()[0][:7]
+    elif os.path.isfile(".git/refs/heads/main"):
+        with open(".git/refs/heads/main", "r") as f:
+            ver=f.readlines()[0][:7]
+    else:
+        ver="<version>"
+
+    return ver
+
+def make_readme(var, md=None):
+    ver=get_commit()
+    f=os.path.basename(var["report_file"])
+    org=var["organism"].replace("_", " ").capitalize()
+    readme=f"""## Readme
+
+Under {f} you will find a list of all relevant files from the analysis and to which section
+they belong to.
+
+*fastqc*: fastqc results
+
+*multiqc*: multiqc results
+
+*deseq2*: differential gene expression results
+
+*topgo*: topGO enrichment analysis of differentialy expressed genes (ie. padj < 0.05)
+
+*qc_plots*: quality control of differential gene expression
+
+*samples.mapping.xlsx* file to group and replicate mapping
+
+## Material and methods
+
+RNAseq analysis was performed using mpgagebioinformatics/jawm_rnaseq@{ver} and can be reproduced with: \
+`jawm jawm_rnaseq@{ver} --global.var.geo <GEO ACCESSION>`. Shortly, \
+reads were mapped to {org} reference genome (Ensembl {var["release"]}) using Kallisto (v0.48.0). \
+After normalization of read counts by making use of the standard median-ratio for estimation \
+of size factors, pair-wise differential gene expression was performed using DESeq2 (v1.38.0). \
+After removal of genes with less then 10 overall reads log2 fold changes were shrank using \
+approximate posterior estimation for GLM coefficients."""
+
+    if md:
+        with open(md, "w") as md_out:
+            md_out.write(readme)
+
+    return readme
 
 
 download_link=jawm.Process( 
