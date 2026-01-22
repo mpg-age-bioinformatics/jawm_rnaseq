@@ -486,10 +486,17 @@ if __name__ == "__main__":
     # list most relevant files
     if var.get("report_file", False) :
 
-        report={}
-        report.update( fastqc.report_files( fastqc.fastqc.var["fastqc_output"] ) )
-        report.update( multiqc.report_files( multiqc.multiqc.var["multiqc_output"] ) )    
-        report.update( deseq2.report_files( deseq2.deseq2.var["deseq2_output"] ) )
+        sample_mapping=os.path.join( kallisto.unstranded_mapping.var["raw_data"], "samples.mapping.xlsx" )
+
+        def add_files(report={}, add={} ):
+            for k in add :
+                report[k]=report.get(k, []) + add[k]
+            return report
+        
+        report=add_files(report={}, add=fastqc.report_files( fastqc.fastqc.var["fastqc_output"] ) )
+        report=add_files(report=report, add=multiqc.report_files( multiqc.multiqc.var["multiqc_output"] ) )
+        report=add_files(report=report, add=deseq2.report_files( deseq2.deseq2.var["deseq2_output"] ) )
+        report=add_files(report=report, add={"main" : [sample_mapping]} )
 
         with open( f'{var["report_file"]}_', "w") as f :
             for folder, file_list in report.items() :

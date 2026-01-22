@@ -237,11 +237,15 @@ groups = pd.DataFrame(groups, columns=["file_1", "file_2", "group"])
 groups["group"] = groups["group"].apply(lambda x: age.safe_filename(x))
 groups["rep"] = add_rep_suffix(groups["group"])
 
+
 source_folder = "{{source_folder}}"
 dest_folder = "{{raw_data}}"
 
 if not os.path.isdir(dest_folder):
     os.makedirs(dest_folder)
+
+groups.to_excel(os.path.join(dest_folder, "samples.mapping.xlsx"), index=False )
+
 
 # We'll collect all concat jobs and run them with max 4 workers
 futures = []
