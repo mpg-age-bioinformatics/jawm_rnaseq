@@ -8,6 +8,9 @@
   # before_script: "module load apptainer"
   # manager_slurm: {"--ntasks-per-core":"2", "-p":"general,small" }
   parallel: True
+
+- includes:
+    - .submodules/*/yaml/nexus.apptainer.yaml
   # var:
   #   geo: GSE141097 
     # groups:
