@@ -137,6 +137,10 @@ Parsing groups out of a GEO accession only works if the sample names finish with
             "read2_suffix":".read_2.fastq.gz"
         })
 
+        # readme file path
+        if not var.get("readme_file", False) :
+            var["readme_file"]=os.path.join(var["project_folder"], "README.md")
+
         ##################
         # kallisto index #
         ##################
@@ -488,16 +492,18 @@ Parsing groups out of a GEO accession only works if the sample names finish with
 
         deseq2.qc_plots.execute( )
 
+    # create a reference file for hashing
+    _rnaseq.make_padj_hash_file( var["deseq2_output"] )
+
+    # write readme file
+    readme=_rnaseq.make_readme(var, var["readme_file"] )
+
     # wait for all jobs to finish
     jawm.Process.wait( )
 
-    # write Readme and list most relevant files
+    # list most relevant files
     if not var.get("report_file", False) :
         var["report_file"]=os.path.join(var["project_folder"], "report_file.txt")
-    if not var.get("readme_file", False) :
-        var["readme_file"]=os.path.join(var["project_folder"], "README.md")
-    
-    readme=_rnaseq.make_readme(var, var["readme_file"] )
 
     def add_files(report={}, add={} ):
         for k in add :

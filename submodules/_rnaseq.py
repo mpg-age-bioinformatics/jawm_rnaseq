@@ -427,6 +427,19 @@ def get_commit():
 
     return ver
 
+def make_padj_hash_file( deseq2_output ):
+    results_files=os.listdir(deseq2_output)
+    results_files=[ s for s in results_files if s.endswith(".results.tsv") ]
+    padj=[]
+    for f in results_files :
+        tmp=pd.read_csv(os.path.join( deseq2_output, f ), sep="\t" )
+        tmp=tmp["padj"].tolist()
+        padj=padj+tmp
+    padj.sort()
+    padj=pd.DataFrame(padj,header="padj")
+    padj.to_csv( os.path.join( deseq2_output, "padj.hash.tsv" ), sep="\t" ) 
+
+
 def make_readme(var, md=None):
     ver=get_commit()
     f=os.path.basename(var["report_file"])
@@ -568,6 +581,9 @@ with ProcessPoolExecutor(max_workers=w  ) as executor:
             source_name_1 = source_files_1
             source_path_1 = os.path.join(source_folder, source_files_1)
 
+            if not os.path.isfile(source_path_1):
+                raise FileNotFoundError(f"{source_path_1} not found")
+
             if str("{{copy}}").lower() != "true":
                 os.symlink(source_path_1, dest_path_1)
             else:
@@ -576,6 +592,9 @@ with ProcessPoolExecutor(max_workers=w  ) as executor:
             if source_files_2:
                 source_name_2 = source_files_2
                 source_path_2 = os.path.join(source_folder, source_files_2)
+
+                if not os.path.isfile(source_path_2):
+                    raise FileNotFoundError(f"{source_path_2} not found")
 
                 if str("{{copy}}").lower() != "true":
                     os.symlink(source_path_2, dest_path_2)
