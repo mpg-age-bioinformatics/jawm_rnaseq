@@ -1,0 +1,2 @@
+- includes:
+    - .submodules/*/yaml/nexus.apptainer.yaml
