@@ -13,6 +13,8 @@ if __name__ == "__main__":
     import random
     from datetime import datetime
     import csv
+    import shutil
+
 
     # Start timestamp
     start = datetime.now()
@@ -518,6 +520,8 @@ Parsing groups out of a GEO accession only works if the sample names finish with
     # list most relevant files
     if not var.get("report_file", False) :
         var["report_file"]=os.path.join(var["project_folder"], "report_file.txt")
+    var["report_file_"]=os.path.join(var["project_folder"], "report_file.txt")
+
 
     def add_files(report={}, add={} ):
         for k in add :
@@ -527,7 +531,7 @@ Parsing groups out of a GEO accession only works if the sample names finish with
     report={
         "main" : [ os.path.join( kallisto.unstranded_mapping.var["raw_data"], "samples.mapping.xlsx" ) ,
             var["readme_file"],
-            var["report_file"]
+            var["report_file_"]
             ]
     }
 
@@ -540,6 +544,9 @@ Parsing groups out of a GEO accession only works if the sample names finish with
         for folder, file_list in report.items() :
             for file in file_list :
                 f.write(f"{folder} {file}\n")
+
+    if var["report_file_"] != var["report_file"] :
+        shutil.copyfile( f'{var["report_file"]}_', var["report_file_"] )
     
     os.rename(f'{var["report_file"]}_', f'{var["report_file"]}')
 
