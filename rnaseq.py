@@ -507,7 +507,7 @@ Parsing groups out of a GEO accession only works if the sample names finish with
         deseq2.qc_plots.execute( )
 
     # create a reference file for hashing
-    _rnaseq.make_padj_hash_file( var["deseq2_output"] )
+    _rnaseq.make_padj_hash_file( deseq2_output )
 
     # write readme file
     readme=_rnaseq.make_readme(var, var["readme_file"] )
