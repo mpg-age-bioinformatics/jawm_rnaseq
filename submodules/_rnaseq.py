@@ -436,7 +436,7 @@ def make_padj_hash_file( deseq2_output ):
         tmp=tmp["padj"].tolist()
         padj=padj+tmp
     padj.sort()
-    padj=pd.DataFrame(padj,header="padj")
+    padj=pd.DataFrame({"padj":padj})
     padj.to_csv( os.path.join( deseq2_output, "padj.hash.tsv" ), sep="\t" ) 
 
 
