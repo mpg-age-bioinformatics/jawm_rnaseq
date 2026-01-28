@@ -1,2 +1,6 @@
+- scope: process
+  name: preprocess
+  conainer: /nexus/posix0/MAGE-flaski/service/images/jawm/agepy-9acb5de.sif
+
 - includes:
     - ../.submodules/*/yaml/nexus.apptainer.yaml
