@@ -488,9 +488,9 @@ cd {{source_folder}}
 find . -type f \( -name "*.fastq.gz" -o -name "*.fq.gz" \) \
     -not -path "./*" -exec mv {} . \;
 if [ -f fastq.md5sums.txt ] ; then m=fastq.md5sums.1.txt ; else  m=fastq.md5sums.txt ; fi
-grep ".fastq.gz" {{md5sums_file}} > ${f}
-grep ".fq.gz" {{md5sums_file}} >> ${f}
-md5sum -c ${f} > fastq.md5sums.check.log
+grep ".fastq.gz" {{md5sums_file}} > ${m}
+grep ".fq.gz" {{md5sums_file}} >> ${m}
+md5sum -c ${m} > fastq.md5sums.check.log
 """,
     desc={
         "download_link":"Full command for download eg.: wget -r --http-user=NGS_25R480_doej_DX535 --http-passwd=your_delivery_password http://delivery.ccg.uni-koeln.de/downloads/NGS_25R480_doej_DX535",
