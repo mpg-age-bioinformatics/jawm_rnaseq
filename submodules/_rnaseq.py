@@ -495,7 +495,7 @@ md5sum -c fastq.md5sums.txt > fastq.md5sums.check.log
         "download_link":"Full command for download eg.: wget -r --http-user=NGS_25R480_doej_DX535 --http-passwd=your_delivery_password http://delivery.ccg.uni-koeln.de/downloads/NGS_25R480_doej_DX535",
         "source_folder": "Folder where the data will be downloaded to.",
     },
-    container=AGEPY_IMAGE,
+    # container=AGEPY_IMAGE,
 )
 
 preprocess=jawm.Process( 
