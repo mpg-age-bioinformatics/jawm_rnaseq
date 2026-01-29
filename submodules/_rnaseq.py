@@ -446,7 +446,7 @@ def make_readme(var, md=None):
     org=var["organism"].replace("_", " ").capitalize()
     readme=f"""## Readme
 
-Under {f} you will find a list of all relevant files from the analysis and to which section
+Under {f} you will find a list of all relevant files from the analysis and to which section \
 they belong to.
 
 *fastqc*: fastqc results
