@@ -39,7 +39,7 @@ if __name__ == "__main__":
     load_modules([
         "submodules",
         "jawm_kallisto@edfb183",
-        "jawm_deseq2@fad8bae",
+        "jawm_deseq2@8df2c48",
         "jawm_genomes@697ce30",
         "jawm_featurecounts@61779d1",
         "jawm_fastqc@4b2c63d",
