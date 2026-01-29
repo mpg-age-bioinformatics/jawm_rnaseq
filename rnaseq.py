@@ -24,28 +24,28 @@ if __name__ == "__main__":
     #####################
 
     # development
-    # load_modules([
-    #     "submodules",
-    #     "jawm_sra",
-    #     "jawm_fastqc",
-    #     "jawm_genomes",
-    #     "jawm_kallisto",
-    #     "jawm_featurecounts",
-    #     "jawm_multiqc",
-    #     "jawm_deseq2",
-    #     ])
-
-    # production
     load_modules([
         "submodules",
-        "jawm_kallisto@edfb183",
-        "jawm_deseq2@8df2c48",
-        "jawm_genomes@697ce30",
-        "jawm_featurecounts@61779d1",
-        "jawm_fastqc@4b2c63d",
-        "jawm_multiqc@5a14f42",
-        "jawm_sra@782d4ec",
-    ] )
+        "jawm_sra",
+        "jawm_fastqc",
+        "jawm_genomes",
+        "jawm_kallisto",
+        "jawm_featurecounts",
+        "jawm_multiqc",
+        "jawm_deseq2",
+        ])
+
+    # production
+    # load_modules([
+    #     "submodules",
+    #     "jawm_kallisto@edfb183",
+    #     "jawm_deseq2@8df2c48",
+    #     "jawm_genomes@697ce30",
+    #     "jawm_featurecounts@61779d1",
+    #     "jawm_fastqc@4b2c63d",
+    #     "jawm_multiqc@5a14f42",
+    #     "jawm_sra@782d4ec",
+    # ] )
 
 
     ##################
