@@ -62,6 +62,15 @@ if __name__ == "__main__":
     
         images=get_image( ) 
 
+    ############
+    # set evns #
+    ############
+
+    if jawm.utils.docker_available():
+        jawm.Process.update(override=False, environment="docker")
+    elif jawm.utils.apptainer_available():
+        jawm.Process.update(override=False, environment="apptainer")
+
     ##################
     # process groups #
     ##################
