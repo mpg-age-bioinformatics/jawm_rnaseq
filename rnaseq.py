@@ -38,7 +38,7 @@ if __name__ == "__main__":
     # production
     load_modules([
         "submodules",
-        "jawm_kallisto@edfb183",
+        "jawm_kallisto@ceaba6c",
         "jawm_deseq2@8df2c48",
         "jawm_genomes@697ce30",
         "jawm_featurecounts@61779d1",
@@ -54,14 +54,6 @@ if __name__ == "__main__":
 
     workflows, var, args, unknown_args= jawm.utils.parse_arguments( ["main","rnaseq","test", "mastertable"] )
     
-    ############################
-    # download required images #
-    ############################
-
-    if str(var.get("skip_prepull", False)).lower() == "false" :
-    
-        images=get_image( ) 
-
     ############
     # set evns #
     ############
@@ -70,6 +62,15 @@ if __name__ == "__main__":
         jawm.Process.update(override=False, environment="docker")
     elif jawm.utils.apptainer_available():
         jawm.Process.update(override=False, environment="apptainer")
+
+
+    ############################
+    # download required images #
+    ############################
+
+    if str(var.get("skip_prepull", False)).lower() == "false" :
+    
+        images=get_image( ) 
 
     ##################
     # process groups #
