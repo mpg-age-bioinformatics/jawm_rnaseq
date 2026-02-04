@@ -464,7 +464,7 @@ they belong to.
 ## Material and methods
 
 RNAseq analysis was performed using mpgagebioinformatics/jawm_rnaseq@{ver} and can be reproduced with: \
-`jawm jawm_rnaseq@{ver} --global.var.geo <GEO ACCESSION>`. Shortly, \
+`jawm jawm_rnaseq@{ver} --global.var.geo <GEO ACCESSION> --global.var.release {var["release"]}`. Shortly, \
 reads were mapped to {org} reference genome (Ensembl {var["release"]}) using Kallisto (v0.48.0). \
 After normalization of read counts by making use of the standard median-ratio for estimation \
 of size factors, pair-wise differential gene expression was performed using DESeq2 (v1.38.0). \
