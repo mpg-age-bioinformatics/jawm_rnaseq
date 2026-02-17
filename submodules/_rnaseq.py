@@ -453,7 +453,11 @@ they belong to.
 
 *multiqc*: multiqc results
 
-*deseq2*: differential gene expression results
+*deseq2*: differential gene expression results. In there you will find:
+- Differential gene expression results with DESeq2’s median of ratios normalized counts. Ideal for gene count comparisons between samples and for DE analysis; NOT for within sample comparisons).
+- Normalized, variance-stabilized and transformated counts (suitable for exploratory analyses like PCA and clustering; `*vsd.counts.xlsx`). 
+- TPM, transcripts per kilobase million, ideal for gene count comparisons within a sample or between samples of the same sample group (`tmp.xlsx`)
+- FPKM, fragments per kilobase of exon per million fragments mapped. Ideal for gene count comparisons between genes within a sample (`masterTable_annotated.xlsx`). 
 
 *topgo*: topGO enrichment analysis of differentialy expressed genes (ie. padj < 0.05)
 
