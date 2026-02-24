@@ -44,7 +44,7 @@ if __name__ == "__main__":
         "jawm_featurecounts@61779d1",
         "jawm_fastqc@4b2c63d",
         "jawm_multiqc@5a14f42",
-        "jawm_sra@782d4ec",
+        "jawm_sra@46317a2",
     ] )
 
 
