@@ -32,7 +32,7 @@ def _bucket_dir_for_gse(gse: str) -> str:
     return f"GSE{prefix}nnn" if prefix else "GSEnnn"
 
 
-def _download_family_soft_text(
+def __family_soft_text(
     gse: str,
     *,
     timeout: int = 60,
@@ -105,9 +105,9 @@ def geo_gse_to_bioproject_and_samples(
     user_agent: str = "geo-soft-parser/1.0 (contact: you@example.com)",
 ) -> Tuple[Optional[str], List[Tuple[str, str]]]:
     """
-    Convenience wrapper: downloads + parses.
+    Convenience wrapper: s + parses.
     """
-    soft_text = _download_family_soft_text(gse, timeout=timeout, user_agent=user_agent)
+    soft_text = __family_soft_text(gse, timeout=timeout, user_agent=user_agent)
     parsed=parse_bioproject_and_gsms_from_family_soft(soft_text)
     return parsed
 
@@ -489,12 +489,12 @@ download_link=jawm.Process(
 mkdir -p {{source_folder}}
 cd {{source_folder}}
 {{download_link}}
-find . -type f \( -name "*.fastq.gz" -o -name "*.fq.gz" \) \
-    -not -path "./*" -exec mv {} . \;
+find . -mindepth 2 -type f \( -name "*.fastq.gz" -o -name "*.fq.gz" \) -exec mv -n {} . \;
 if [ -f fastq.md5sums.txt ] ; then m=fastq.md5sums.1.txt ; else  m=fastq.md5sums.txt ; fi
 grep ".fastq.gz" {{md5sums_file}} > ${m}
 grep ".fq.gz" {{md5sums_file}} >> ${m}
-md5sum -c ${m} > fastq.md5sums.check.log
+md5sum -c ${m} > fastq.md5sums.check.tmp || exit 1
+mv fastq.md5sums.check.tmp fastq.md5sums.check.log
 """,
     desc={
         "download_link":"Full command for download eg.: wget -r --http-user=NGS_25R480_doej_DX535 --http-passwd=your_delivery_password http://delivery.ccg.uni-koeln.de/downloads/NGS_25R480_doej_DX535",
