@@ -13,4 +13,6 @@ on:
 jobs:
   build:
     uses: mpg-age-bioinformatics/jawm/.github/workflows/modules.webhook.yaml@main
+    with:
+      runner: self-hosted
     secrets: inherit

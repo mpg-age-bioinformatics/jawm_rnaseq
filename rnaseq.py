@@ -24,28 +24,28 @@ if __name__ == "__main__":
     #####################
 
     # development
-    # load_modules([
-    #     "submodules",
-    #     "jawm_sra",
-    #     "jawm_fastqc",
-    #     "jawm_genomes",
-    #     "jawm_kallisto",
-    #     "jawm_featurecounts",
-    #     "jawm_multiqc",
-    #     "jawm_deseq2",
-    #     ])
-
-    # production
     load_modules([
         "submodules",
-        "jawm_kallisto@ceaba6c",
-        "jawm_deseq2@e2827df",
-        "jawm_genomes@697ce30",
-        "jawm_featurecounts@61779d1",
-        "jawm_fastqc@4b2c63d",
-        "jawm_multiqc@5a14f42",
-        "jawm_sra@46317a2",
-    ] )
+        "jawm_sra",
+        "jawm_fastqc",
+        "jawm_genomes",
+        "jawm_kallisto",
+        "jawm_featurecounts",
+        "jawm_multiqc",
+        "jawm_deseq2",
+        ])
+
+    # production
+    # load_modules([
+    #     "submodules",
+    #     "jawm_kallisto@ceaba6c",
+    #     "jawm_deseq2@e2827df",
+    #     "jawm_genomes@697ce30",
+    #     "jawm_featurecounts@61779d1",
+    #     "jawm_fastqc@4b2c63d",
+    #     "jawm_multiqc@5a14f42",
+    #     "jawm_sra@46317a2",
+    # ] )
 
 
     ##################
@@ -109,6 +109,8 @@ Parsing groups out of a GEO accession only works if the sample names finish with
             release, available=genomes.get_latest_ensembl_release(var['organism'])
             jawm.Process.update( var={ "release" : release } )
             var["release"]=release
+        else:
+            var["release"]=str(var["release"])
 
         # seq type: primary_assembly vs. toplevel (preference for primary_assembly )
         if "seq_type" not in var :
@@ -440,7 +442,7 @@ Parsing groups out of a GEO accession only works if the sample names finish with
         deseq2.parse_submission.execute()
         deseq2.tx2gene_proc.execute( deseq2.tx2gene.hash )
 
-        jawm.Process.wait([ deseq2.tx2gene_proc.hash, deseq2.parse_submission.hash ])
+        jawm.Process.wait( [ deseq2.tx2gene_proc.hash, deseq2.parse_submission.hash ] )
 
         deseq2_output = deseq2.deseq2.var["deseq2_output"]
         tests = glob.glob( os.path.join( deseq2_output, "*input.tsv" ) )
@@ -562,7 +564,13 @@ Parsing groups out of a GEO accession only works if the sample names finish with
 
     if workflow( "test", workflows ) :
         # for the test workflow we also do something more (just for rnaseq)
+        var["deseq2_output"]=deseq2.deseq2.var["deseq2_output"]
+        deseq2.round_master_table(var)
         logger.info("Test completed.")
+
+    ###################
+    # report run time #
+    ###################
 
     # End timestamp
     end = datetime.now()

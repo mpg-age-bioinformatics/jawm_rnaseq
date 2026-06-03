@@ -1,8 +1,13 @@
 - scope: global
   environment: "docker"
+  parallel: False
   var:
     map.source_folder: "./test/test-input"
+    mk.project_folder: "./test/test-output"
     organism: "caenorhabditis_elegans"
+    release: 114
+    cpus: 1
+    report_file: "./test/test-output/report.txt"
     groups:
       N2.Rep_1.READ_1.fastq.gz;;N2_untreated\n
       N2.Rep_2.READ_1.fastq.gz;;N2_untreated\n
@@ -18,5 +23,5 @@
       daf2_treated.Rep_3.READ_1.fastq.gz;;daf2_treated
  
 - scope: hash
-  include: ./test/test-output/rnaseq.txt
+  include: ./test/test-output/deseq2_output/all_results_stats.rounded.tsv
   overwrite: true # overwrite any existing hash already present on the logs folder
