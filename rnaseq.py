@@ -313,6 +313,7 @@ Parsing groups out of a GEO accession only works if the sample names finish with
         read1_files = list(Path( fastqc.fastqc.var["raw_data"] ).glob(f'*{fastqc.fastqc.var["read1_suffix"]}'))
         read1_files=[ str(s) for s in read1_files if not str(s).startswith("tmp.") ]
         read2_files = [ str(s).split( var["read1_suffix"] )[0] +var["read2_suffix"] for s in read1_files  ]
+        read2_files = [ s for s in read2_files if Path(f).is_file() ]
 
         ##########
         # fastqc #
@@ -324,46 +325,6 @@ Parsing groups out of a GEO accession only works if the sample names finish with
         for f in read1_files + read2_files :
             fastqc_=fastqc.fastqc.clone()
             fastqc_.var["map.f"]=f
-
-            ## debug online failure
-            p = Path(f)
-            if not p.is_file():
-                base_dir = p.parent
-
-                print(f"\nERROR: FastQC input is not a file: {p}", file=sys.stderr)
-
-                print(f"exists={p.exists()}", file=sys.stderr)
-
-                print(f"is_dir={p.is_dir()}", file=sys.stderr)
-
-                print(f"is_file={p.is_file()}", file=sys.stderr)
-
-                if p.exists() and p.is_dir():
-
-                    print("\nContents of offending directory:", file=sys.stderr)
-
-                    for sub in sorted(p.rglob("*")):
-
-                        kind = "DIR " if sub.is_dir() else "FILE"
-
-                        print(f"  [{kind}] {sub}", file=sys.stderr)
-
-                print(f"\nContents of base dir: {base_dir}", file=sys.stderr)
-
-                if base_dir.exists():
-
-                    for sub in sorted(base_dir.iterdir()):
-
-                        kind = "DIR " if sub.is_dir() else "FILE"
-
-                        print(f"  [{kind}] {sub.name}", file=sys.stderr)
-
-                else:
-
-                    print("Base dir does not exist", file=sys.stderr)
-
-                sys.exit(1)
-
             fastqc_.execute( preprocess_jobs )
             fastqc_jobs.append(fastqc_.hash)
 
