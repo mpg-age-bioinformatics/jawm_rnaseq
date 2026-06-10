@@ -328,8 +328,40 @@ Parsing groups out of a GEO accession only works if the sample names finish with
             ## debug online failure
             p = Path(f)
             if not p.is_file():
-                print(f"ERROR: FastQC input is not a file: {p}", file=sys.stderr)
-                print(f"exists={p.exists()} is_dir={p.is_dir()}", file=sys.stderr)
+                base_dir = p.parent
+
+                print(f"\nERROR: FastQC input is not a file: {p}", file=sys.stderr)
+
+                print(f"exists={p.exists()}", file=sys.stderr)
+
+                print(f"is_dir={p.is_dir()}", file=sys.stderr)
+
+                print(f"is_file={p.is_file()}", file=sys.stderr)
+
+                if p.exists() and p.is_dir():
+
+                    print("\nContents of offending directory:", file=sys.stderr)
+
+                    for sub in sorted(p.rglob("*")):
+
+                        kind = "DIR " if sub.is_dir() else "FILE"
+
+                        print(f"  [{kind}] {sub}", file=sys.stderr)
+
+                print(f"\nContents of base dir: {base_dir}", file=sys.stderr)
+
+                if base_dir.exists():
+
+                    for sub in sorted(base_dir.iterdir()):
+
+                        kind = "DIR " if sub.is_dir() else "FILE"
+
+                        print(f"  [{kind}] {sub.name}", file=sys.stderr)
+
+                else:
+
+                    print("Base dir does not exist", file=sys.stderr)
+
                 sys.exit(1)
 
             fastqc_.execute( preprocess_jobs )
