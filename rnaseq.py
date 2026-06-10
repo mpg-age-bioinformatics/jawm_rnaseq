@@ -324,6 +324,14 @@ Parsing groups out of a GEO accession only works if the sample names finish with
         for f in read1_files + read2_files :
             fastqc_=fastqc.fastqc.clone()
             fastqc_.var["map.f"]=f
+
+            ## debug online failure
+            p = Path(f)
+            if not p.is_file():
+                print(f"ERROR: FastQC input is not a file: {p}", file=sys.stderr)
+                print(f"exists={p.exists()} is_dir={p.is_dir()}", file=sys.stderr)
+                sys.exit(1)
+
             fastqc_.execute( preprocess_jobs )
             fastqc_jobs.append(fastqc_.hash)
 
