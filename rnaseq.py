@@ -24,28 +24,28 @@ if __name__ == "__main__":
     #####################
 
     # development
-    load_modules([
-        "submodules",
-        "jawm_sra",
-        "jawm_fastqc",
-        "jawm_genomes",
-        "jawm_kallisto",
-        "jawm_featurecounts",
-        "jawm_multiqc",
-        "jawm_deseq2",
-        ])
-
-    # production
     # load_modules([
     #     "submodules",
-    #     "jawm_kallisto@ceaba6c",
-    #     "jawm_deseq2@e2827df",
-    #     "jawm_genomes@697ce30",
-    #     "jawm_featurecounts@61779d1",
-    #     "jawm_fastqc@4b2c63d",
-    #     "jawm_multiqc@5a14f42",
-    #     "jawm_sra@46317a2",
-    # ] )
+    #     "jawm_sra",
+    #     "jawm_fastqc",
+    #     "jawm_genomes",
+    #     "jawm_kallisto",
+    #     "jawm_featurecounts",
+    #     "jawm_multiqc",
+    #     "jawm_deseq2",
+    #     ])
+
+    # production
+    load_modules([
+        "submodules",
+        "jawm_kallisto@ceaba6c6dbda2079305d865e9f286805f313b60f",
+        "jawm_deseq2@c889e846575b264db82e944ec9761a995a2faa72",
+        "jawm_genomes@c03d80e52718c051df86356f5ff3a1a9f152bdef",
+        "jawm_featurecounts@934695ceed652b9163f36aa41c15a20aed626cab",
+        "jawm_fastqc@6c73866090e035efa2ac39b88e3b67a22e463ffb",
+        "jawm_multiqc@7f272a9e76109bc1d4d03f134d78b94fb695733b",
+        "jawm_sra@86e24d879641bf32c638184a4e301da551448214",
+    ] )
 
 
     ##################
