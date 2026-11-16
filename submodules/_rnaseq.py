@@ -461,6 +461,34 @@ they belong to.
 
 *topgo*: topGO enrichment analysis of differentialy expressed genes (ie. padj < 0.05)
 
+*STRING networks*: one STRING functional-association network per annotated differential-expression contrast, \
+stored under `metadata/string-networks/<network-id>/`. The report lists each network's `network.graphml` \
+and `manifest.json`; check the manifest's `contrast` field to identify the comparison.
+
+- Open `network.graphml` as a network in Cytoscape. Node attributes include `role` (`seed` or `added`) \
+and, where available, `log2FoldChange`, `padj` and `direction`. Use these attributes to distinguish selected \
+genes from added proteins and to color nodes by expression change. Interpret the fold-change sign using \
+the corresponding DESeq2 contrast.
+- For the RNA-seq app viewer, keep the complete dataset directory, including `metadata/string-networks/`, \
+when uploading the dataset or importing a `.studio` file. The app discovers completed networks; \
+`network.json` is the saved viewer snapshot.
+- Open `nodes.tsv` and `edges.tsv` as tab-separated tables for filtering or further analysis. \
+`selected_genes.tsv` records the selected input genes; `mapping.tsv` identifies mapped and unmapped \
+seeds; `expansion_candidates.tsv` records candidate added proteins; and `removed_isolated_nodes.tsv` \
+lists proteins removed because they had no retained connections. `node_expression_mapping.tsv` links \
+retained proteins to available gene-level expression data.
+- Consult `manifest.json` for the exact settings, selection summary, source contrast and software provenance. \
+The defaults use STRING 12.5, select genes with `padj < 0.05`, rank by absolute \
+`log2FoldChange` times `-log10(padj)`, and retain up to 1,000 seeds before identifier mapping. \
+Networks use combined confidence scores of at least 0.7 and add up to 25% of the number of unique mapped \
+seeds as connecting proteins. Unmapped seeds are not replaced, and isolated proteins are removed.
+
+STRING edges represent functional associations; they do not necessarily indicate direct physical binding. \
+Confidence scores describe association evidence, not differential-expression significance or effect size. \
+Added proteins need not be differentially expressed and may lack expression measurements; check `role`, \
+`padj` and the mapping reports before drawing conclusions. A small or empty network can reflect selection, \
+unmapped identifiers or removal of isolated proteins, so consult the manifest and diagnostic tables.
+
 *qc_plots*: quality control of differential gene expression
 
 *samples.mapping.xlsx* file to group and replicate mapping
