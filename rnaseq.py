@@ -42,7 +42,7 @@ if __name__ == "__main__":
         "jawm_deseq2@c889e846575b264db82e944ec9761a995a2faa72",
         "jawm_genomes@c03d80e52718c051df86356f5ff3a1a9f152bdef",
         "jawm_featurecounts@934695ceed652b9163f36aa41c15a20aed626cab",
-        "jawm_fastqc@6c73866090e035efa2ac39b88e3b67a22e463ffb",
+        "jawm_fastqc@00d0318e241df49cc2d86936022ddd908f8b8ada",
         "jawm_multiqc@7f272a9e76109bc1d4d03f134d78b94fb695733b",
         "jawm_sra@86e24d879641bf32c638184a4e301da551448214",
     ] )
