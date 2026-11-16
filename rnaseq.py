@@ -38,6 +38,7 @@ if __name__ == "__main__":
     # production
     load_modules([
         "submodules",
+        "jawm_string",
         "jawm_kallisto@ceaba6c6dbda2079305d865e9f286805f313b60f",
         "jawm_deseq2@c889e846575b264db82e944ec9761a995a2faa72",
         "jawm_genomes@c03d80e52718c051df86356f5ff3a1a9f152bdef",
@@ -479,13 +480,20 @@ Parsing groups out of a GEO accession only works if the sample names finish with
         annotated_output = os.path.join(deseq2_output, "annotated")
         tests_results = glob.glob(os.path.join(annotated_output, "*results.tsv"))
         topgo_jobs=[]
-        for file in tests_results:
+        string_jobs=[]
+        for file in sorted(tests_results):
+            # One default app-compatible network per annotated contrast.
+            # All clones share a persistent, globally rate-limited STRING cache.
+            string_=string_networks.configure(file,var,pipeline_file=__file__)
+            string_.execute(deseq2.annotator.hash)
+            string_jobs.append(string_.hash)
+
             topgo_=deseq2.topgo.clone()
             topgo_.var["input_file"]=os.path.basename(file)
             topgo_.execute( )
             topgo_jobs.append( topgo_.hash )
 
-        jawm.Process.wait( topgo_jobs + [ deseq2.david.hash ] )
+        jawm.Process.wait( topgo_jobs + string_jobs + [ deseq2.david.hash ] )
 
         david_files=glob.glob(os.path.join(annotated_output, "*.DAVID.tsv"))
         togo_files=glob.glob(os.path.join(annotated_output, "*.topGO.tsv"))
@@ -552,6 +560,8 @@ Parsing groups out of a GEO accession only works if the sample names finish with
     report=add_files(report=report, add=multiqc.report_files( multiqc.multiqc.var["multiqc_output"] ) )
     report=add_files(report=report, add=deseq2.report_files( deseq2.deseq2.var["deseq2_output"] ) )
 
+
+    report=add_files(report=report, add=string_networks.report_files(var["project_folder"]))
 
     with open( f'{var["report_file"]}_', "w") as f :
         for folder, file_list in report.items() :
