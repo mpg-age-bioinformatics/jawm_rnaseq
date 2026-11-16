@@ -38,7 +38,7 @@ if __name__ == "__main__":
     # production
     load_modules([
         "submodules",
-        "jawm_string",
+        "jawm_string@e7f0cd93d8fc846b7321378ce8e604bddb203da3",
         "jawm_kallisto@ceaba6c6dbda2079305d865e9f286805f313b60f",
         "jawm_deseq2@c889e846575b264db82e944ec9761a995a2faa72",
         "jawm_genomes@c03d80e52718c051df86356f5ff3a1a9f152bdef",
