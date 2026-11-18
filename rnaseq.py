@@ -40,7 +40,7 @@ if __name__ == "__main__":
         "submodules",
         "jawm_string@e7f0cd93d8fc846b7321378ce8e604bddb203da3",
         "jawm_kallisto@ceaba6c6dbda2079305d865e9f286805f313b60f",
-        "jawm_deseq2@c889e846575b264db82e944ec9761a995a2faa72",
+        "jawm_deseq2@29134c5771161535c2816d0ad7f389fba8826196",
         "jawm_genomes@c03d80e52718c051df86356f5ff3a1a9f152bdef",
         "jawm_featurecounts@934695ceed652b9163f36aa41c15a20aed626cab",
         "jawm_fastqc@1e729d1cf8d27e1c05a4b445bf5d2a20bf2f97f3",
