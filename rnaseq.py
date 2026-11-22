@@ -38,7 +38,7 @@ if __name__ == "__main__":
     # production
     load_modules([
         "submodules",
-        "jawm_string@e7f0cd93d8fc846b7321378ce8e604bddb203da3",
+        "jawm_string@14f4de77feba0ae666f75565e355f822d49a9e62",
         "jawm_kallisto@ceaba6c6dbda2079305d865e9f286805f313b60f",
         "jawm_deseq2@29134c5771161535c2816d0ad7f389fba8826196",
         "jawm_genomes@c03d80e52718c051df86356f5ff3a1a9f152bdef",
@@ -481,6 +481,10 @@ Parsing groups out of a GEO accession only works if the sample names finish with
         tests_results = glob.glob(os.path.join(annotated_output, "*results.tsv"))
         topgo_jobs=[]
         string_jobs=[]
+        # STRINGDB opts into a shared, versioned local database. Preparation
+        # waits for concurrent downloads and completes before network submission.
+        if tests_results:
+            string_networks.prepare_database(var)
         for file in sorted(tests_results):
             # One default app-compatible network per annotated contrast.
             # All clones share a persistent, globally rate-limited STRING cache.
