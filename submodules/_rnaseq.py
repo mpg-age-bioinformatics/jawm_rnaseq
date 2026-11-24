@@ -491,6 +491,9 @@ unmapped identifiers or removal of isolated proteins, so consult the manifest an
 
 *qc_plots*: quality control of differential gene expression
 
+*metadata/raw-inputs.md5.tsv*: original raw input paths and MD5 checksums,
+with individual lanes recorded separately.
+
 *samples.mapping.xlsx* file to group and replicate mapping
 
 ## Material and methods
@@ -513,23 +516,102 @@ approximate posterior estimation for GLM coefficients."""
 download_link=jawm.Process( 
     name="download_link",
     when=lambda p: not os.path.isfile( os.path.join( p.var["source_folder"],"fastq.md5sums.check.log" ) ) ,
-    script="""#!/bin/bash
+    script=r"""#!/bin/bash
+set -e
 mkdir -p {{source_folder}}
 cd {{source_folder}}
 {{download_link}}
 find . -mindepth 2 -type f \( -name "*.fastq.gz" -o -name "*.fq.gz" \) -exec mv -n {} . \;
-if [ -f fastq.md5sums.txt ] ; then m=fastq.md5sums.1.txt ; else  m=fastq.md5sums.txt ; fi
-grep ".fastq.gz" {{md5sums_file}} > ${m}
-grep ".fq.gz" {{md5sums_file}} >> ${m}
-md5sum -c ${m} > fastq.md5sums.check.tmp || exit 1
+if [ -f fastq.md5sums.txt ] ; then m=fastq.md5sums.1.txt ; else m=fastq.md5sums.txt ; fi
+# Keep provider checksums for the downloaded FASTQs, matching flattened basenames.
+grep -E '\.(fastq|fq)\.gz' "{{md5sums_file}}" | sed -E 's@^([[:xdigit:]]{32}[[:space:]]+[*]?).*/@\1@' > "${m}.tmp"
+test -s "${m}.tmp"
+mv "${m}.tmp" "${m}"
+md5sum -c "${m}" > fastq.md5sums.check.tmp || exit 1
 mv fastq.md5sums.check.tmp fastq.md5sums.check.log
 """,
     desc={
         "download_link":"Full command for download eg.: wget -r --http-user=NGS_25R480_doej_DX535 --http-passwd=your_delivery_password http://delivery.ccg.uni-koeln.de/downloads/NGS_25R480_doej_DX535",
         "source_folder": "Folder where the data will be downloaded to.",
+        "md5sums_file": "Provider checksum file downloaded by download_link; relative to source_folder or absolute.",
     },
     # container=AGEPY_IMAGE,
 )
+
+
+def configure_raw_md5sums(files, output_file, md5sums_file=None):
+    """Record checksums, optionally verifying an external file by basename."""
+    files = list(dict.fromkeys(os.path.abspath(path) for path in files))
+    output_file = os.path.abspath(output_file)
+    md5sums_file = os.path.abspath(md5sums_file) if md5sums_file else None
+    process = raw_md5sums.clone()
+    process.script = process.script.replace("{{output_file}}", repr(output_file))
+    process.script = process.script.replace("{{md5sums_file}}", repr(md5sums_file))
+    process.var.update({
+        "files": repr(files),
+        "output_file": output_file,
+        "md5sums_file": md5sums_file or "",
+        "mk.output_folder": os.path.dirname(output_file),
+    })
+    inputs = files + ([md5sums_file] if md5sums_file else [])
+    folders = {os.path.dirname(path) for path in inputs}
+    folders.update(os.path.dirname(os.path.realpath(path)) for path in inputs)
+    for index, folder in enumerate(sorted(folders)):
+        process.var["map.input_folder_" + str(index)] = folder
+    return process
+
+
+raw_md5sums = jawm.Process(
+    name="raw_md5sums",
+    when=lambda p: bool(p.var["md5sums_file"]) or not os.path.isfile(p.var["output_file"]),
+    script=r"""#!/usr/bin/env python3
+import hashlib
+from pathlib import Path
+import re
+
+files = {{files}}
+output = Path({{output_file}})
+md5sums_file = {{md5sums_file}}
+expected = {}
+if md5sums_file:
+    with open(md5sums_file, encoding="utf-8") as recorded:
+        for line in recorded:
+            if not line.strip() or line.lstrip().startswith("#"):
+                continue
+            match = re.fullmatch(r"([0-9a-fA-F]{32}) [ *](.+)", line.rstrip("\r\n"))
+            if match:
+                checksum, filename = match.groups()
+            else:
+                filename, checksum = line.rstrip("\r\n").rsplit("\t", 1)
+                if not re.fullmatch(r"[0-9a-fA-F]{32}", checksum):
+                    raise ValueError("Invalid MD5 entry: " + line.rstrip())
+            basename = Path(filename).name
+            checksum = checksum.lower()
+            if basename in expected and expected[basename] != checksum:
+                raise ValueError("Conflicting MD5 entries for " + basename)
+            expected[basename] = checksum
+output.parent.mkdir(parents=True, exist_ok=True)
+temporary = output.with_name(output.name + ".tmp")
+with temporary.open("w", encoding="utf-8") as report:
+    for filename in files:
+        digest = hashlib.md5()
+        with open(filename, "rb") as source:
+            for block in iter(lambda: source.read(1024 * 1024), b""):
+                digest.update(block)
+        checksum = digest.hexdigest()
+        if md5sums_file and expected.get(Path(filename).name) != checksum:
+            raise ValueError("Missing or mismatched recorded MD5 for " + filename)
+        report.write(f"{filename}\t{checksum}\n")
+temporary.replace(output)
+""",
+    var={"files": "[]", "output_file": "", "md5sums_file": ""},
+    desc={"files": "Input file paths, set by configure_raw_md5sums.",
+          "output_file": "Destination TSV containing <file> <md5sum> rows.",
+          "md5sums_file": "Optional recorded MD5 file; compare by file basename."},
+    container="python:3.12-slim",
+    manager_slurm={"--mem": "2GB", "-t": "24:00:00", "-c": "1"},
+)
+
 
 preprocess=jawm.Process( 
     name="preprocess",

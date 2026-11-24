@@ -316,6 +316,26 @@ Parsing groups out of a GEO accession only works if the sample names finish with
         read2_files = [ str(s).split( var["read1_suffix"] )[0] +var["read2_suffix"] for s in read1_files  ]
         read2_files = [ s for s in read2_files if Path(s).is_file() ]
 
+        ######################
+        # md5sums recordings #
+        ######################
+
+        if not bioproject:
+            # Use original inputs from the sample table, including individual lanes.
+            raw_files = [
+                os.path.join(_rnaseq.preprocess.var["source_folder"], name.strip())
+                for row in var["groups"].replace(r"\n", "\n").splitlines()
+                for field in row.split(";")[:2]
+                for name in field.split(",") if name.strip()
+            ]
+            raw_md5sums = _rnaseq.configure_raw_md5sums(
+                raw_files,
+                os.path.join(var["project_folder"], "metadata", "raw-inputs.md5.tsv"),
+                # Provider checksums are verified during download, before renaming.
+                md5sums_file=None if "download_link" in var else var.get("md5sums_file"))
+            raw_md5sums.execute(preprocess_jobs)
+            jawm.Process.wait(raw_md5sums.hash)
+
         ##########
         # fastqc #
         ##########
@@ -559,6 +579,10 @@ Parsing groups out of a GEO accession only works if the sample names finish with
             var["report_file_"]
             ]
     }
+
+    raw_input_checksums = os.path.join(var["project_folder"], "metadata", "raw-inputs.md5.tsv")
+    if os.path.isfile(raw_input_checksums):
+        report=add_files(report=report, add={"raw_inputs": [raw_input_checksums]})
 
     report=add_files(report=report, add=fastqc.report_files( fastqc.fastqc.var["fastqc_output"] ) )
     report=add_files(report=report, add=multiqc.report_files( multiqc.multiqc.var["multiqc_output"] ) )
