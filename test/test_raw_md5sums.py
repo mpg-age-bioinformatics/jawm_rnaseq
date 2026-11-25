@@ -4,6 +4,7 @@ import copy
 import gzip
 import hashlib
 import os
+import re
 from pathlib import Path
 import subprocess
 import sys
@@ -37,10 +38,13 @@ class RawChecksumTests(unittest.TestCase):
         self.root = Path(self.temp.name)
         self.output = self.root / 'metadata' / "checksums' report.tsv"
 
-    def execute(self, files, md5sums_file=None):
-        namespace = {'os': os, 'raw_md5sums': ProcessStub()}
+    def configure(self, files, md5sums_file=None):
+        namespace = {'os': os, 're': re, 'raw_md5sums': ProcessStub()}
         exec(compile(ast.Module(body=[HELPER], type_ignores=[]), '<helper>', 'exec'), namespace)
-        process = namespace['configure_raw_md5sums'](files, self.output, md5sums_file)
+        return namespace['configure_raw_md5sums'](files, self.output, md5sums_file)
+
+    def execute(self, files, md5sums_file=None):
+        process = self.configure(files, md5sums_file)
         script = process.script
         for key, value in process.var.items():
             script = script.replace('{{' + key + '}}', value)
@@ -91,6 +95,55 @@ class RawChecksumTests(unittest.TestCase):
                 result = self.execute([raw], reference)
                 self.assertNotEqual(result.returncode, 0)
                 self.assertFalse(self.output.exists())
+
+    def test_inline_checksums_support_both_formats_and_literal_blocks(self):
+        raw = self.root / "reads' with spaces.fastq.gz"
+        raw.write_bytes(b'ACGT')
+        checksum = hashlib.md5(raw.read_bytes()).hexdigest()
+        entries = [f"{checksum.upper()}  elsewhere/{raw.name}",
+                   f"{checksum} *elsewhere/{raw.name}",
+                   f"elsewhere/{raw.name}\t{checksum}"]
+        for entry in entries:
+            for content in [entry, entry + '\n', '# recorded checksums\n\n' + entry + '\n']:
+                with self.subTest(content=content):
+                    process = self.configure([raw], content)
+                    self.assertEqual(process.var['md5sums_file'], '')
+                    self.assertEqual(process.var['md5sums_content'], content)
+                    mounts = [value for key, value in process.var.items()
+                              if key.startswith('map.input_folder_')]
+                    self.assertEqual(set(mounts), {str(self.root), str(self.root.resolve())})
+                    result = self.execute([raw], content)
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertEqual(self.output.read_text(), f"{raw}\t{checksum}\n")
+
+    def test_inline_block_verifies_multiple_files(self):
+        files = [self.root / 'first.fastq.gz', self.root / 'second.fastq.gz']
+        for index, path in enumerate(files):
+            path.write_bytes(f'reads {index}'.encode())
+        content = ''.join(f"{hashlib.md5(path.read_bytes()).hexdigest()}  {path.name}\n"
+                          for path in files)
+        result = self.execute(files, content)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(len(self.output.read_text().splitlines()), 2)
+
+    def test_inline_verification_fails_without_replacing_existing_report(self):
+        raw = self.root / 'reads.fastq.gz'
+        raw.write_bytes(b'ACGT')
+        checksum = hashlib.md5(raw.read_bytes()).hexdigest()
+        self.output.parent.mkdir()
+        self.output.write_text('previous report\n')
+        for content in [f"{checksum}  other.fastq.gz\n",
+                        f"{'0' * 32}  {raw.name}\n",
+                        f"{checksum}  a/{raw.name}\n{'0' * 32}  b/{raw.name}\n",
+                        '# no entries\n', 'invalid entry\n']:
+            with self.subTest(content=content):
+                process = self.configure([raw], content)
+                condition = next(item.value for item in PROCESS.keywords if item.arg == 'when')
+                should_run = eval(compile(ast.Expression(condition), '<when>', 'eval'), {'os': os})
+                self.assertTrue(should_run(process))
+                result = self.execute([raw], content)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertEqual(self.output.read_text(), 'previous report\n')
 
 
     def test_provider_download_captures_checksums_before_preprocessing(self):

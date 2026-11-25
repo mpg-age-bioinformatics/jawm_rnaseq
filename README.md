@@ -53,6 +53,23 @@ format above. Missing entries, mismatches, or conflicting entries for the same
 basename fail the job before FastQC. Entries are compared against the original
 raw filenames, including individual lanes before concatenation.
 
+For local inputs, `md5sums_file` also accepts inline checksum content. In a YAML
+configuration, use a literal block under `global.var`:
+
+```yaml
+- scope: global
+  var:
+    md5sums_file: |
+      d41d8cd98f00b204e9800998ecf8427e  N2.Rep_1.READ_1.fastq.gz
+      098f6bcd4621d373cade4e832627b4f6  N2.Rep_2.READ_1.fastq.gz
+```
+
+Replace these illustrative hashes with the actual checksums and include every
+input file selected in `groups`. Inline content accepts the same formats,
+comments, and basename matching as a checksum file. A multiline value or a
+single checksum entry is treated as content; other values are treated as paths.
+The Python `configure_raw_md5sums` helper accepts either form too.
+
 For service-provider downloads, `download_link` must also download the provider's
 checksum file specified by `md5sums_file` (relative to `source_folder` or absolute).
 The download step extracts its FASTQ entries to `fastq.md5sums.txt` (or

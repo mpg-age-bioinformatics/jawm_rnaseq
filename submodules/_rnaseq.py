@@ -540,17 +540,27 @@ mv fastq.md5sums.check.tmp fastq.md5sums.check.log
 
 
 def configure_raw_md5sums(files, output_file, md5sums_file=None):
-    """Record checksums, optionally verifying an external file by basename."""
+    """Record checksums, optionally verifying a path or inline content by basename."""
     files = list(dict.fromkeys(os.path.abspath(path) for path in files))
     output_file = os.path.abspath(output_file)
+    md5sums_content = None
+    if isinstance(md5sums_file, str) and md5sums_file:
+        # A YAML literal block may contain just one entry without a final newline.
+        if ("\n" in md5sums_file or "\r" in md5sums_file or
+                (not os.path.isfile(md5sums_file) and
+                 re.fullmatch(r"(?:[0-9a-fA-F]{32} [ *].+|.+\t[0-9a-fA-F]{32})",
+                              md5sums_file))):
+            md5sums_content, md5sums_file = md5sums_file, None
     md5sums_file = os.path.abspath(md5sums_file) if md5sums_file else None
     process = raw_md5sums.clone()
     process.script = process.script.replace("{{output_file}}", repr(output_file))
     process.script = process.script.replace("{{md5sums_file}}", repr(md5sums_file))
+    process.script = process.script.replace("{{md5sums_content}}", repr(md5sums_content))
     process.var.update({
         "files": repr(files),
         "output_file": output_file,
         "md5sums_file": md5sums_file or "",
+        "md5sums_content": md5sums_content or "",
         "mk.output_folder": os.path.dirname(output_file),
     })
     inputs = files + ([md5sums_file] if md5sums_file else [])
@@ -563,18 +573,22 @@ def configure_raw_md5sums(files, output_file, md5sums_file=None):
 
 raw_md5sums = jawm.Process(
     name="raw_md5sums",
-    when=lambda p: bool(p.var["md5sums_file"]) or not os.path.isfile(p.var["output_file"]),
+    when=lambda p: bool(p.var["md5sums_file"] or p.var["md5sums_content"]) or not os.path.isfile(p.var["output_file"]),
     script=r"""#!/usr/bin/env python3
 import hashlib
+from io import StringIO
 from pathlib import Path
 import re
 
 files = {{files}}
 output = Path({{output_file}})
 md5sums_file = {{md5sums_file}}
+md5sums_content = {{md5sums_content}}
+verify = md5sums_file is not None or md5sums_content is not None
 expected = {}
-if md5sums_file:
-    with open(md5sums_file, encoding="utf-8") as recorded:
+if verify:
+    with (StringIO(md5sums_content) if md5sums_content is not None
+          else open(md5sums_file, encoding="utf-8")) as recorded:
         for line in recorded:
             if not line.strip() or line.lstrip().startswith("#"):
                 continue
@@ -599,15 +613,15 @@ with temporary.open("w", encoding="utf-8") as report:
             for block in iter(lambda: source.read(1024 * 1024), b""):
                 digest.update(block)
         checksum = digest.hexdigest()
-        if md5sums_file and expected.get(Path(filename).name) != checksum:
+        if verify and expected.get(Path(filename).name) != checksum:
             raise ValueError("Missing or mismatched recorded MD5 for " + filename)
         report.write(f"{filename}\t{checksum}\n")
 temporary.replace(output)
 """,
-    var={"files": "[]", "output_file": "", "md5sums_file": ""},
+    var={"files": "[]", "output_file": "", "md5sums_file": "", "md5sums_content": ""},
     desc={"files": "Input file paths, set by configure_raw_md5sums.",
           "output_file": "Destination TSV containing <file> <md5sum> rows.",
-          "md5sums_file": "Optional recorded MD5 file; compare by file basename."},
+          "md5sums_file": "Optional recorded MD5 file path or inline checksum content; compare by file basename."},
     container="python:3.12-slim",
     manager_slurm={"--mem": "2GB", "-t": "24:00:00", "-c": "1"},
 )
