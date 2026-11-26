@@ -27,6 +27,21 @@ jawm rnaseq.py rnaseq -p ./yaml/vars.yaml ./yaml/hpc.yaml
 
 Additional jawm workflows are available [here (GitHub.com)](https://github.com/mpg-age-bioinformatics?q=jawm_&type=all&language=&sort=).
 
+## STRING network outputs
+
+Each annotated `<comparison>.results.tsv` produces a network under
+`<project_folder>/string-networks/<comparison>/`. Files directly inside that
+directory use the prefix `<comparison>_`, for example
+`daf12_vs_WT_network.graphml`, `daf12_vs_WT_nodes.tsv`, and
+`daf12_vs_WT_manifest.json`. The report lists the new GraphML and manifest paths.
+Rerunning generates this layout while reusing cached STRING data; existing
+`metadata/string-networks/<hash>/` outputs are left in place.
+
+The copied `reference/` folder contains the STRING species catalog used to resolve
+organism names to taxonomy IDs, its source/checksum/license metadata, and the
+scientific workflow snapshot's provenance. Its files retain their original names.
+Bulk STRING databases and API caches are stored separately.
+
 ## Raw-file checksums
 
 The `raw_md5sums` Process uses `python:3.12-slim` to hash a list of files and
